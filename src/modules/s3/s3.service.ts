@@ -12,16 +12,18 @@ export class S3Service {
   private region: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.region = this.configService.get<string>('AWS_S3_REGION');
-    this.bucketName = this.configService.get<string>('AWS_S3_BUCKET_NAME');
-    
+    const region = this.configService.get<string>('AWS_S3_REGION');
+    const bucketName = this.configService.get<string>('AWS_S3_BUCKET_NAME');
     const accessKey = this.configService.get<string>('AWS_S3_ACCESS_KEY');
     const secretKey = this.configService.get<string>('AWS_S3_SECRET_KEY');
 
-    if (!this.region || !this.bucketName || !accessKey || !secretKey) {
+    if (!region || !bucketName || !accessKey || !secretKey) {
       this.logger.warn('S3 configuration is incomplete. Uploads might fail.');
       return;
     }
+
+    this.region = region;
+    this.bucketName = bucketName;
 
     this.s3Client = new S3Client({
       region: this.region,
