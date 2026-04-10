@@ -1,0 +1,76 @@
+import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, IsArray, ValidateNested, IsMongoId } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class VariantDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsNumber()
+  @IsNotEmpty()
+  price: number;
+}
+
+class AddonDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsNumber()
+  @IsNotEmpty()
+  price: number;
+}
+
+export class CreateMenuItemDto {
+  @IsMongoId()
+  @IsNotEmpty()
+  restaurantId: string;
+
+  @IsMongoId()
+  @IsNotEmpty()
+  categoryId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsNumber()
+  @IsNotEmpty()
+  price: number;
+
+  @IsNumber()
+  @IsOptional()
+  discountPrice?: number;
+
+  @IsString()
+  @IsOptional()
+  image?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isAvailable?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isVeg?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isSpicy?: boolean;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => VariantDto)
+  @IsOptional()
+  variants?: VariantDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AddonDto)
+  @IsOptional()
+  addons?: AddonDto[];
+}

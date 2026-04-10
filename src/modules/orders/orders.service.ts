@@ -1,0 +1,325 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { Order, OrderDocument, OrderStatus, OrderItem } from './schemas/order.schema';
+import { CheckoutDto } from './dto/create-order.dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { CartsService } from '../carts/carts.service';
+import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
+import { Restaurant, RestaurantDocument } from '../restaurants/schemas/restaurant.schema';
+
+import { AssignDriverDto } from './dto/assign-driver.dto';
+import { DriversService } from '../drivers/drivers.service';
+import { WalletsService } from '../wallets/wallets.service';
+import { SocketsGateway } from '../sockets/sockets.gateway';
+import { PaymentsService } from '../payments/payments.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
+import { TransactionType } from '../payments/schemas/transaction.schema';
+
+@Injectable()
+export class OrdersService {
+  constructor(
+    @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
+    @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
+    @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
+    private readonly cartsService: CartsService,
+    private readonly driversService: DriversService,
+    private readonly walletsService: WalletsService,
+    private readonly socketsGateway: SocketsGateway,
+    private readonly paymentsService: PaymentsService,
+    private readonly notificationsService: NotificationsService,
+    private readonly settingsService: SettingsService,
+  ) {}
+
+  async checkout(checkoutDto: CheckoutDto): Promise<{ orders: OrderDocument[], paymentData?: any }> {
+    const { userId, deliveryAddress, paymentMethod } = checkoutDto;
+
+    // Check Global Settings (Maintenance Mode and Min Order Value)
+    const settings = await this.settingsService.getSettings();
+    if (settings.isMaintenanceMode) {
+      throw new BadRequestException(settings.maintenanceMessage || 'Platform is currently under maintenance.');
+    }
+
+    // Fetch the user's cart
+    const cart = await this.cartsService.getCart(userId);
+    if (!cart || cart.items.length === 0) {
+      throw new BadRequestException('Cannot place an order with an empty cart');
+    }
+
+    // Group items by restaurant
+    const itemsByRestaurant = new Map<string, any[]>();
+    for (const item of cart.items) {
+      const restaurantIdStr = item.restaurantId.toString();
+      let restaurantItems = itemsByRestaurant.get(restaurantIdStr);
+      if (!restaurantItems) {
+        restaurantItems = [];
+        itemsByRestaurant.set(restaurantIdStr, restaurantItems);
+      }
+      
+      // Fetch menu item name for the snapshot
+      const menuItem = await this.menuItemModel.findById(item.menuItemId).exec();
+      const itemName = menuItem ? menuItem.name : 'Unknown Item';
+
+      restaurantItems.push({
+        menuItemId: item.menuItemId,
+        name: itemName,
+        quantity: item.quantity,
+        price: item.price,
+        variant: item.variant,
+        addons: item.addons,
+        totalItemPrice: item.totalItemPrice,
+      });
+    }
+
+    const createdOrders: OrderDocument[] = [];
+
+    // Create an order per restaurant
+    for (const [restaurantIdStr, items] of itemsByRestaurant.entries()) {
+      const subTotal = items.reduce((acc, current) => acc + current.totalItemPrice, 0);
+
+      if (subTotal < settings.minOrderValue) {
+        throw new BadRequestException(`Order from restaurant must be at least ₹${settings.minOrderValue}`);
+      }
+
+      const staticTax = subTotal * settings.taxPercentage; // Dynamic tax
+      const staticDeliveryFee = settings.deliveryBaseFee; // Dynamic delivery fee
+      const totalAmount = subTotal + staticTax + staticDeliveryFee;
+
+      const orderData = {
+        userId: new Types.ObjectId(userId),
+        restaurantId: new Types.ObjectId(restaurantIdStr),
+        items: items,
+        deliveryAddress,
+        subTotal,
+        tax: staticTax,
+        deliveryFee: staticDeliveryFee,
+        totalAmount,
+        status: OrderStatus.PENDING,
+        paymentMethod,
+        paymentStatus: 'PENDING',
+      };
+
+      const createdOrder = new this.orderModel(orderData);
+      await createdOrder.save();
+      createdOrders.push(createdOrder);
+    }
+
+    // Clear cart upon successful order placement
+    await this.cartsService.clearCart(userId);
+
+    // If online payment (not COD), generate Razorpay Order for the total amount
+    if (paymentMethod !== 'COD') {
+      const grandTotal = createdOrders.reduce((acc, order) => acc + order.totalAmount, 0);
+      const paymentData = await this.paymentsService.createRazorpayOrder(
+        userId,
+        grandTotal,
+        TransactionType.ORDER_PAYMENT,
+        createdOrders.length === 1 ? createdOrders[0]._id.toString() : undefined // Link total if single restaurant
+      );
+      
+      // Notify Restaurant Owners about NEW order
+      for (const order of createdOrders) {
+        const restaurant = await this.restaurantModel.findById(order.restaurantId).exec();
+        if (restaurant && restaurant.ownerId) {
+          await this.notificationsService.sendToUser(restaurant.ownerId.toString(), {
+            title: 'New Order Received! 🍔',
+            body: `You have a new order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount}`,
+            data: { orderId: order._id.toString(), type: 'NEW_ORDER' }
+          });
+        }
+      }
+
+      return { orders: createdOrders, paymentData };
+    }
+
+    // Notify Restaurant Owners about NEW COD order
+    for (const order of createdOrders) {
+      const restaurant = await this.restaurantModel.findById(order.restaurantId).exec();
+      if (restaurant && restaurant.ownerId) {
+        await this.notificationsService.sendToUser(restaurant.ownerId.toString(), {
+          title: 'New COD Order Received! 💵',
+          body: `New COD order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount}`,
+          data: { orderId: order._id.toString(), type: 'NEW_ORDER' }
+        });
+      }
+    }
+
+    return { orders: createdOrders };
+  }
+
+  async getUserOrders(userId: string): Promise<Order[]> {
+    return this.orderModel.find({ userId: new Types.ObjectId(userId) }).sort({ createdAt: -1 }).exec();
+  }
+
+  async getRestaurantOrders(restaurantId: string): Promise<Order[]> {
+    return this.orderModel.find({ restaurantId: new Types.ObjectId(restaurantId) }).sort({ createdAt: -1 }).exec();
+  }
+
+  async getOrderById(id: string): Promise<Order> {
+    const order = await this.orderModel.findById(id).exec();
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+    return order;
+  }
+
+  async updateOrderStatus(id: string, updateOrderStatusDto: UpdateOrderStatusDto): Promise<Order> {
+    const order = await this.orderModel.findByIdAndUpdate(
+      id,
+      { status: updateOrderStatusDto.status },
+      { new: true }
+    ).exec();
+
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+    
+    // Emit order status update via websockets
+    this.socketsGateway.emitOrderStatus(id, updateOrderStatusDto.status);
+
+    // Notify Customer about Status Change
+    await this.notificationsService.sendToUser(order.userId.toString(), {
+      title: 'Order Update 🍕',
+      body: `Your order status is now: ${updateOrderStatusDto.status}`,
+      data: { orderId: id, status: updateOrderStatusDto.status }
+    });
+    
+    return order;
+  }
+
+  async assignDriver(id: string, assignDriverDto: AssignDriverDto): Promise<Order> {
+    const { driverId } = assignDriverDto;
+
+    // Verify driver exists and is available
+    const driver = await this.driversService.findOne(driverId);
+    if (!driver.isAvailable) {
+      throw new BadRequestException(`Driver with ID ${driverId} is currently not available.`);
+    }
+
+    // Update order with driverId and bump status
+    const order = await this.orderModel.findByIdAndUpdate(
+      id,
+      { 
+        driverId: new Types.ObjectId(driverId),
+        status: OrderStatus.PREPARING // Auto progression
+      },
+      { new: true }
+    ).exec();
+
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+
+    // Notify Customer
+    await this.notificationsService.sendToUser(order.userId.toString(), {
+      title: 'Driver Assigned! 🛵',
+      body: 'A driver has been assigned to your order and is on the way.',
+      data: { orderId: id, status: 'DRIVER_ASSIGNED' }
+    });
+
+    // Notify Driver
+    await this.notificationsService.sendToUser(driverId, {
+      title: 'New Delivery Assigned! 📦',
+      body: `You have a new delivery at ${order.deliveryAddress.street}, ${order.deliveryAddress.city}`,
+      data: { orderId: id, type: 'NEW_DELIVERY' }
+    });
+    
+    return order;
+  }
+
+  async markDelivered(id: string, driverId: string): Promise<Order> {
+    const order = await this.orderModel.findById(id).exec();
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+
+    if (!order.driverId || order.driverId.toString() !== driverId) {
+      throw new BadRequestException('You are not authorized to mark this order as delivered. Is it assigned to you?');
+    }
+
+    if (order.status !== OrderStatus.OUT_FOR_DELIVERY && order.status !== OrderStatus.PREPARING) {
+      throw new BadRequestException(`Cannot deliver an order in ${order.status} status.`);
+    }
+
+    order.status = OrderStatus.DELIVERED;
+    await order.save();
+
+    // Trigger phase 2 earning mechanisms securely!
+    await this.walletsService.processDeliveryEarnings(
+      driverId, 
+      id, 
+      order.deliveryFee || 0, // Injected standard delivery cut 
+      order.totalAmount,     // Used if the payment is COD
+      order.paymentMethod
+    );
+
+    // Trigger Admin/Platform commission and Restaurant Earnings
+    await this.walletsService.processRestaurantEarnings(
+      order.restaurantId.toString(),
+      id,
+      order.subTotal
+    );
+
+    // Notify Customer about Delivery
+    await this.notificationsService.sendToUser(order.userId.toString(), {
+      title: 'Order Delivered! 🍕',
+      body: 'Your Rasikae treat has been delivered. Enjoy your meal!',
+      data: { orderId: id, status: 'DELIVERED' }
+    });
+
+    return order;
+  }
+
+  async autoAssignDriver(id: string, maxDistance: number = 10000): Promise<{ order: Order, driverId?: string, message: string }> {
+    const order = await this.orderModel.findById(id).exec();
+    if (!order) throw new NotFoundException(`Order with ID ${id} not found`);
+
+    if (order.driverId) {
+      throw new BadRequestException('Order already has an assigned driver.');
+    }
+
+    const restaurant = await this.restaurantModel.findById(order.restaurantId).exec();
+    if (!restaurant) throw new NotFoundException('Restaurant not found for this order.');
+    
+    if (!restaurant.location || !restaurant.location.coordinates || restaurant.location.coordinates.length < 2) {
+      throw new BadRequestException('Restaurant does not have valid GPS coordinates defined.');
+    }
+
+    const [lng, lat] = restaurant.location.coordinates;
+    const nearbyDrivers = await this.driversService.findNearbyAvailable(lng, lat, maxDistance);
+
+    if (nearbyDrivers.length === 0) {
+      return { order, message: 'No available drivers found within range.' };
+    }
+
+    // Driver array sorted by $nearSphere, so 0 is nearest
+    const matchedDriver = nearbyDrivers[0] as any; 
+
+    order.driverId = matchedDriver._id as any; 
+    order.status = OrderStatus.PREPARING;
+    await order.save();
+
+    const matchedDriverId = matchedDriver._id.toString();
+
+    // Notify Customer
+    await this.notificationsService.sendToUser(order.userId.toString(), {
+      title: 'Driver Matched! 🛵',
+      body: 'We found a driver for your order!',
+      data: { orderId: id, status: 'DRIVER_ASSIGNED' }
+    });
+
+    // Notify Driver
+    await this.notificationsService.sendToUser(matchedDriverId, {
+      title: 'Auto-Assigned New Delivery! 📦',
+      body: `Nearby delivery assigned at ${order.deliveryAddress.street}`,
+      data: { orderId: id, type: 'NEW_DELIVERY' }
+    });
+
+    return { 
+      order, 
+      driverId: matchedDriverId,
+      message: 'Driver successfully matched and auto-assigned!' 
+    };
+  }
+}

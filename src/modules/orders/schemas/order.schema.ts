@@ -1,0 +1,117 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import mongoose, { Document } from 'mongoose';
+
+export type OrderDocument = Order & Document;
+
+export enum OrderStatus {
+  PENDING = 'PENDING',
+  ACCEPTED = 'ACCEPTED',
+  PREPARING = 'PREPARING',
+  OUT_FOR_DELIVERY = 'OUT_FOR_DELIVERY',
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED',
+}
+
+@Schema({ _id: false })
+export class Address {
+  @Prop({ required: true })
+  street: string;
+
+  @Prop({ required: true })
+  city: string;
+
+  @Prop({ required: true })
+  state: string;
+
+  @Prop({ required: true })
+  zipCode: string;
+}
+
+const AddressSchema = SchemaFactory.createForClass(Address);
+
+@Schema({ _id: false })
+class SelectedVariant {
+  @Prop({ required: true })
+  name: string;
+
+  @Prop({ required: true })
+  price: number;
+}
+const SelectedVariantSchema = SchemaFactory.createForClass(SelectedVariant);
+
+@Schema({ _id: false })
+class SelectedAddon {
+  @Prop({ required: true })
+  name: string;
+
+  @Prop({ required: true })
+  price: number;
+}
+const SelectedAddonSchema = SchemaFactory.createForClass(SelectedAddon);
+
+@Schema()
+export class OrderItem {
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true })
+  menuItemId: mongoose.Types.ObjectId;
+
+  @Prop({ required: true })
+  name: string;
+
+  @Prop({ required: true, min: 1 })
+  quantity: number;
+
+  @Prop({ required: true })
+  price: number;
+
+  @Prop({ type: SelectedVariantSchema, required: false })
+  variant?: SelectedVariant;
+
+  @Prop({ type: [SelectedAddonSchema], default: [] })
+  addons: SelectedAddon[];
+
+  @Prop({ required: true })
+  totalItemPrice: number;
+}
+
+const OrderItemSchema = SchemaFactory.createForClass(OrderItem);
+
+@Schema({ timestamps: true })
+export class Order {
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  userId: mongoose.Types.ObjectId;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true })
+  restaurantId: mongoose.Types.ObjectId;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false })
+  driverId?: mongoose.Types.ObjectId;
+
+  @Prop({ type: [OrderItemSchema], required: true })
+  items: OrderItem[];
+
+  @Prop({ type: AddressSchema, required: true })
+  deliveryAddress: Address;
+
+  @Prop({ required: true })
+  subTotal: number;
+
+  @Prop({ required: true, default: 0 })
+  tax: number;
+
+  @Prop({ required: true, default: 0 })
+  deliveryFee: number;
+
+  @Prop({ required: true })
+  totalAmount: number;
+
+  @Prop({ required: true, enum: OrderStatus, default: OrderStatus.PENDING })
+  status: string;
+
+  @Prop({ required: true })
+  paymentMethod: string;
+
+  @Prop({ required: true, default: 'PENDING' })
+  paymentStatus: string;
+}
+
+export const OrderSchema = SchemaFactory.createForClass(Order);
