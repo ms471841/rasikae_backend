@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsArray, ValidateNested, IsIn, IsNumber } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsArray, ValidateNested, IsIn, IsNumber, IsMongoId } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class LocationDto {
@@ -41,12 +41,12 @@ export class CreateRestaurantDto {
   coverImages?: string[];
 
   @IsArray()
-  @IsString({ each: true })
+  @IsMongoId({ each: true })
   @IsOptional()
   categories?: string[];
 
   @IsArray()
-  @IsString({ each: true })
+  @IsMongoId({ each: true })
   @IsOptional()
   cuisines?: string[];
 

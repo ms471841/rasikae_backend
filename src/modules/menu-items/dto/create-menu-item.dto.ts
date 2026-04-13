@@ -11,7 +11,7 @@ class VariantDto {
   price: number;
 }
 
-class AddonDto {
+class AddonOptionDto {
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -19,6 +19,34 @@ class AddonDto {
   @IsNumber()
   @IsNotEmpty()
   price: number;
+}
+
+class AddonGroupDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isRequired?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  isMultiple?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  minSelections?: number;
+
+  @IsNumber()
+  @IsOptional()
+  maxSelections?: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AddonOptionDto)
+  @IsNotEmpty()
+  options: AddonOptionDto[];
 }
 
 export class CreateMenuItemDto {
@@ -70,7 +98,7 @@ export class CreateMenuItemDto {
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => AddonDto)
+  @Type(() => AddonGroupDto)
   @IsOptional()
-  addons?: AddonDto[];
+  addonGroups?: AddonGroupDto[];
 }

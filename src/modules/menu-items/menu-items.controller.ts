@@ -23,6 +23,11 @@ export class MenuItemsController {
     return this.menuItemsService.findByRestaurant(id);
   }
 
+  @Get('restaurant/:id/grouped')
+  findByRestaurantGrouped(@Param('id') id: string) {
+    return this.menuItemsService.getGroupedMenuByRestaurant(id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.menuItemsService.findOne(id);

@@ -17,20 +17,13 @@ export class UsersController {
     @CurrUser() user: any,
     @Body() createUserDto: CreateUserDto,
   ) {
-    console.log('--- syncUser Controller Request ---');
-    console.log('Received user object keys:', Object.keys(user || {}));
-    console.log('user.uid:', user?.uid);
-    console.log('user.firebaseUid:', user?.firebaseUid);
-    
     const uid = user?.uid || user?.firebaseUid;
-    console.log('Resolved uid:', uid);
-    console.log('createUserDto:', createUserDto);
-    
     return this.usersService.syncUser(
       uid,
       createUserDto,
       user?.email,
       user?.phone_number || user?.phone,
+      
     );
   }
 

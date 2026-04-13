@@ -11,8 +11,8 @@ export class CuisinesController {
   constructor(private readonly cuisinesService: CuisinesService) {}
 
   @Post()
-  @UseGuards(FirebaseAuthGuard, RolesGuard)
-  @Roles('admin')
+  // @UseGuards(FirebaseAuthGuard, RolesGuard)
+  // @Roles('admin')
   create(@Body() createCuisineDto: CreateCuisineDto) {
     return this.cuisinesService.create(createCuisineDto);
   }

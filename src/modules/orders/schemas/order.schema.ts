@@ -46,6 +46,9 @@ class SelectedAddon {
 
   @Prop({ required: true })
   price: number;
+
+  @Prop({ required: true })
+  groupName: string;
 }
 const SelectedAddonSchema = SchemaFactory.createForClass(SelectedAddon);
 

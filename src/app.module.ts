@@ -26,6 +26,8 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { SearchModule } from './modules/search/search.module';
+import { FavouriteRestaurantsModule } from './modules/favourite-restaurants/favourite-restaurants.module';
 
 @Module({
   imports: [
@@ -52,6 +54,8 @@ import { SettingsModule } from './modules/settings/settings.module';
     NotificationsModule,
     UploadsModule,
     SettingsModule,
+    SearchModule,
+    FavouriteRestaurantsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

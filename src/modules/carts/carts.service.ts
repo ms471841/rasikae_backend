@@ -49,15 +49,32 @@ export class CartsService {
     }
 
     let addonsPrice = 0;
-    const selectedAddons: { name: string; price: number }[] = [];
+    const selectedAddons: { name: string; price: number; groupName: string }[] = [];
     if (addonNames && addonNames.length > 0) {
       for (const addonName of addonNames) {
-        const addon = menuItem.addons.find(a => a.name === addonName);
-        if (!addon) {
+        let foundAddon: any = null;
+        let foundGroupName = '';
+
+        // Search through all addon groups to find the specific addon
+        for (const group of (menuItem as any).addonGroups) {
+          const option = group.options.find((o: any) => o.name === addonName);
+          if (option) {
+            foundAddon = option;
+            foundGroupName = group.name;
+            break;
+          }
+        }
+
+        if (!foundAddon) {
           throw new BadRequestException(`Addon ${addonName} not found on this item`);
         }
-        addonsPrice += addon.price;
-        selectedAddons.push({ name: addon.name, price: addon.price });
+
+        addonsPrice += foundAddon.price;
+        selectedAddons.push({
+          name: foundAddon.name,
+          price: foundAddon.price,
+          groupName: foundGroupName,
+        });
       }
     }
 

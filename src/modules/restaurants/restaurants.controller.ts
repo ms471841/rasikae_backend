@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { RestaurantsService } from './restaurants.service';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
@@ -25,9 +25,58 @@ export class RestaurantsController {
     return this.restaurantsService.create(mongoUser._id.toString(), createRestaurantDto);
   }
 
+  @Get('home-feed')
+  async getHomeFeed(
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+    @Query('limit') limit?: string,
+    @Query('minRating') minRating?: string,
+    @Query('maxDistance') maxDistance?: string,
+    @Query('isVeg') isVeg?: string,
+    @Query('cuisines') cuisines?: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    const parsedLat = lat ? parseFloat(lat) : undefined;
+    const parsedLng = lng ? parseFloat(lng) : undefined;
+    const parsedLimit = limit ? parseInt(limit, 10) : 10;
+    
+    const filters = {
+      minRating: minRating ? parseFloat(minRating) : undefined,
+      maxDistance: maxDistance ? parseFloat(maxDistance) : undefined,
+      isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
+      cuisines: cuisines ? cuisines.split(',') : undefined,
+      categoryId: categoryId,
+    };
+    
+    return this.restaurantsService.getHomeFeed(parsedLat, parsedLng, parsedLimit, filters);
+  }
+
   @Get()
-  async findAll() {
-    return this.restaurantsService.findAll();
+  async findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+    @Query('minRating') minRating?: string,
+    @Query('maxDistance') maxDistance?: string,
+    @Query('isVeg') isVeg?: string,
+    @Query('cuisines') cuisines?: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedLimit = limit ? parseInt(limit, 10) : 10;
+    const parsedLat = lat ? parseFloat(lat) : undefined;
+    const parsedLng = lng ? parseFloat(lng) : undefined;
+
+    const filters = {
+      minRating: minRating ? parseFloat(minRating) : undefined,
+      maxDistance: maxDistance ? parseFloat(maxDistance) : undefined,
+      isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
+      cuisines: cuisines ? cuisines.split(',') : undefined,
+      categoryId: categoryId,
+    };
+
+    return this.restaurantsService.findAll(parsedPage, parsedLimit, parsedLat, parsedLng, filters);
   }
 
   @Get('my-restaurants')

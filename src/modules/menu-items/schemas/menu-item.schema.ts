@@ -14,14 +14,36 @@ class Variant {
 const VariantSchema = SchemaFactory.createForClass(Variant);
 
 @Schema({ _id: false })
-class Addon {
+class AddonOption {
   @Prop({ required: true })
   name: string;
 
   @Prop({ required: true })
   price: number;
 }
-const AddonSchema = SchemaFactory.createForClass(Addon);
+const AddonOptionSchema = SchemaFactory.createForClass(AddonOption);
+
+@Schema({ _id: false })
+class AddonGroup {
+  @Prop({ required: true })
+  name: string;
+
+  @Prop({ default: false })
+  isRequired: boolean;
+
+  @Prop({ default: true })
+  isMultiple: boolean;
+
+  @Prop({ default: 0 })
+  minSelections: number;
+
+  @Prop({ default: 1 })
+  maxSelections: number;
+
+  @Prop({ type: [AddonOptionSchema], default: [] })
+  options: AddonOption[];
+}
+const AddonGroupSchema = SchemaFactory.createForClass(AddonGroup);
 
 @Schema({ timestamps: true })
 export class MenuItem {
@@ -64,8 +86,8 @@ export class MenuItem {
   @Prop({ type: [VariantSchema], default: [] })
   variants: Variant[];
 
-  @Prop({ type: [AddonSchema], default: [] })
-  addons: Addon[];
+  @Prop({ type: [AddonGroupSchema], default: [] })
+  addonGroups: AddonGroup[];
 }
 
 export const MenuItemSchema = SchemaFactory.createForClass(MenuItem);

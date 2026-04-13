@@ -43,11 +43,11 @@ export class Restaurant {
   @Prop({ type: [String], default: [] })
   coverImages?: string[];
 
-  @Prop({ type: [String], default: [] })
-  categories?: string[];
+  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], default: [] })
+  categories?: mongoose.Types.ObjectId[];
 
-  @Prop({ type: [String], default: [] })
-  cuisines?: string[];
+  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Cuisine' }], default: [] })
+  cuisines?: mongoose.Types.ObjectId[];
 
   @Prop()
   deliveryTime?: number;
