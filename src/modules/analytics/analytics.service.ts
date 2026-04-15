@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
@@ -10,6 +10,9 @@ export class AnalyticsService {
   ) {}
 
   async getRestaurantDashboardStats(restaurantId: string) {
+    if (!Types.ObjectId.isValid(restaurantId)) {
+      throw new BadRequestException('Invalid restaurant identifier format');
+    }
     const objectId = new Types.ObjectId(restaurantId);
 
     const [revenueStats, orderCounts, topItems] = await Promise.all([

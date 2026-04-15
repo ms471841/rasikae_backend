@@ -30,8 +30,35 @@ export class MenuItemsService {
     return this.menuItemModel.find().exec();
   }
 
-  async findByRestaurant(id: string): Promise<MenuItem[]> {
-    return this.menuItemModel.find({ restaurantId: id, isAvailable: true }).populate('categoryId').exec();
+  async findByRestaurant(
+    id: string,
+    page: number = 1,
+    limit: number = 10,
+    filters: { isVeg?: boolean } = {}
+  ): Promise<any> {
+    const skip = (page - 1) * limit;
+    const query: any = { restaurantId: id, isAvailable: true };
+
+    if (filters.isVeg !== undefined) {
+      query.isVeg = filters.isVeg;
+    }
+
+    const data = await this.menuItemModel
+      .find(query)
+      .populate('categoryId')
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    const totalItems = await this.menuItemModel.countDocuments(query).exec();
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data,
+      totalItems,
+      totalPages,
+      currentPage: page,
+    };
   }
 
   async getGroupedMenuByRestaurant(id: string): Promise<any[]> {

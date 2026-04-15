@@ -1,15 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Query } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CheckoutDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { AssignDriverDto } from './dto/assign-driver.dto';
 import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { CurrUser } from '../auth/decorators/user.decorator';
+import { UsersService } from '../users/users.service';
 
 @Controller('orders')
 @UseGuards(FirebaseAuthGuard)
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post('checkout')
   create(@CurrUser() user: any, @Body() checkoutDto: CheckoutDto) {
@@ -19,6 +23,19 @@ export class OrdersController {
   @Get('my-orders')
   findAll(@CurrUser() user: any) {
     return this.ordersService.getUserOrders(user._id.toString());
+  }
+
+  @Get('vendor/all')
+  async findVendorOrders(
+    @CurrUser() user: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const uid = user.uid || user.firebaseUid;
+    const mongoUser = await this.usersService.getProfile(uid);
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    return this.ordersService.getVendorOrders(mongoUser._id.toString(), parsedPage, parsedLimit);
   }
 
   @Get('restaurant/:restaurantId')

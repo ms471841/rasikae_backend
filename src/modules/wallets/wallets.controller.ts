@@ -1,5 +1,7 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { WalletsService } from './wallets.service';
+import { Body, Post } from '@nestjs/common';
+import { WithdrawDto } from './dto/withdraw.dto';
 
 @Controller('wallets')
 export class WalletsController {
@@ -23,5 +25,10 @@ export class WalletsController {
   @Get('restaurant/:restaurantId/transactions')
   getRestaurantTransactions(@Param('restaurantId') restaurantId: string) {
     return this.walletsService.getTransactionsByRestaurant(restaurantId);
+  }
+
+  @Post('restaurant/:restaurantId/withdraw')
+  requestWithdraw(@Param('restaurantId') restaurantId: string, @Body() withdrawDto: WithdrawDto) {
+    return this.walletsService.requestWithdrawal(restaurantId, withdrawDto);
   }
 }

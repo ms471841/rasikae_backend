@@ -40,6 +40,16 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     return { event: 'joinedRoom', data: `Joined order_${data.orderId}` };
   }
 
+  @SubscribeMessage('joinVendorRoom')
+  handleJoinVendorRoom(
+    @MessageBody() data: { uid: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.join(`vendor_${data.uid}`);
+    console.log(`Client ${client.id} joined vendor room: vendor_${data.uid}`);
+    return { event: 'joinedRoom', data: `Joined vendor_${data.uid}` };
+  }
+
   @SubscribeMessage('updateLocation')
   handleUpdateLocation(
     @MessageBody() data: { orderId: string; lat: number; lng: number },
@@ -53,11 +63,25 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     });
   }
 
-  // Method to be called from other modules (like OrdersService)
   emitOrderStatus(orderId: string, status: string) {
     this.server.to(`order_${orderId}`).emit('orderStatusUpdated', {
       orderId,
       status,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  emitOrderStatusToVendor(vendorId: string, orderId: string, status: string) {
+    this.server.to(`vendor_${vendorId}`).emit('orderStatusUpdated', {
+      orderId,
+      status,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  emitNewOrder(vendorId: string, order: any) {
+    this.server.to(`vendor_${vendorId}`).emit('newOrder', {
+      order,
       timestamp: new Date().toISOString(),
     });
   }

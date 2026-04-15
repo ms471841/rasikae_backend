@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Wallet, WalletDocument } from './schemas/wallet.schema';
 import { Transaction, TransactionDocument, TransactionType } from './schemas/transaction.schema';
+import { WithdrawDto } from './dto/withdraw.dto';
 
 @Injectable()
 export class WalletsService {
@@ -91,7 +92,7 @@ export class WalletsService {
     const wallet = await this.getWalletByRestaurant(restaurantId);
 
     // Platform Commission logic (Static 10%)
-    const platformCommission = subTotal * 0.10;
+    const platformCommission = Math.round(subTotal * 0.10);
     const finalRestaurantEarning = subTotal - platformCommission;
 
     wallet.availableBalance += finalRestaurantEarning;
@@ -132,5 +133,28 @@ export class WalletsService {
     };
     await new this.transactionModel(txData).save();
     await wallet.save();
+  }
+
+  async requestWithdrawal(restaurantId: string, withdrawDto: WithdrawDto): Promise<WalletDocument> {
+    const { amount, description } = withdrawDto;
+    const wallet = await this.getWalletByRestaurant(restaurantId);
+
+    if (wallet.availableBalance < amount) {
+      throw new BadRequestException('Insufficient balance in wallet.');
+    }
+
+    // Deduct balance
+    wallet.availableBalance -= amount;
+
+    // Create transaction log
+    const txData = {
+      walletId: wallet._id as Types.ObjectId,
+      amount: amount,
+      type: TransactionType.WITHDRAWAL,
+      description: description || `Withdrawal request for restaurant ${restaurantId}`,
+    };
+
+    await new this.transactionModel(txData).save();
+    return wallet.save();
   }
 }

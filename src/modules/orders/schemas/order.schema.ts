@@ -96,16 +96,22 @@ export class Order {
   deliveryAddress: Address;
 
   @Prop({ required: true })
-  subTotal: number;
+  subTotal: number; // Stored in Paise (integers)
 
   @Prop({ required: true, default: 0 })
-  tax: number;
+  tax: number; // Total Tax (Paise)
 
   @Prop({ required: true, default: 0 })
-  deliveryFee: number;
+  cgst: number; // Central GST (2.5%) in Paise
+
+  @Prop({ required: true, default: 0 })
+  sgst: number; // State GST (2.5%) in Paise
+
+  @Prop({ required: true, default: 0 })
+  deliveryFee: number; // Stored in Paise (integers)
 
   @Prop({ required: true })
-  totalAmount: number;
+  totalAmount: number; // Stored in Paise (integers)
 
   @Prop({ required: true, enum: OrderStatus, default: OrderStatus.PENDING })
   status: string;

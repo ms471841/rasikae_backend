@@ -19,13 +19,13 @@ export class Settings {
   @Prop({ default: 'GLOBAL_CONFIG' })
   configId: string; // Used as a singleton key
 
-  @Prop({ default: 5.0 })
+  @Prop({ default: 500 }) // Default 500 Paise (₹5)
   deliveryBaseFee: number;
 
   @Prop({ default: 0.05 })
   taxPercentage: number;
 
-  @Prop({ default: 0 })
+  @Prop({ default: 0 }) // Stored in Paise (integers)
   minOrderValue: number;
 
   @Prop({ default: false })

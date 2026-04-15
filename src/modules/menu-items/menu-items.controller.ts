@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { MenuItemsService } from './menu-items.service';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
@@ -19,8 +19,18 @@ export class MenuItemsController {
   }
 
   @Get('restaurant/:id')
-  findByRestaurant(@Param('id') id: string) {
-    return this.menuItemsService.findByRestaurant(id);
+  findByRestaurant(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('isVeg') isVeg?: string,
+  ) {
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedLimit = limit ? parseInt(limit, 10) : 10;
+    const filters = {
+      isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
+    };
+    return this.menuItemsService.findByRestaurant(id, parsedPage, parsedLimit, filters);
   }
 
   @Get('restaurant/:id/grouped')

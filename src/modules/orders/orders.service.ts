@@ -56,7 +56,7 @@ export class OrdersService {
         if (transaction) {
           paymentData = {
             razorpayOrderId: transaction.razorpayOrderId,
-            amount: transaction.amount * 100, // paisa
+            amount: transaction.amount, // Already in Paise
             currency: 'INR',
             keyId: this.configService.get<string>('RAZORPAY_KEY_ID'),
           };
@@ -120,8 +120,11 @@ export class OrdersService {
         throw new BadRequestException(`Order from restaurant must be at least ₹${settings.minOrderValue}`);
       }
 
-      const staticTax = subTotal * settings.taxPercentage; // Dynamic tax
-      const staticDeliveryFee = settings.deliveryBaseFee; // Dynamic delivery fee
+      const staticTax = Math.round(subTotal * settings.taxPercentage); // Total Tax
+      const cgst = Math.round(staticTax / 2);
+      const sgst = staticTax - cgst; // Remaining goes to SGST (handles odd paise)
+
+      const staticDeliveryFee = settings.deliveryBaseFee;
       const totalAmount = subTotal + staticTax + staticDeliveryFee;
 
       const orderData = {
@@ -131,6 +134,8 @@ export class OrdersService {
         deliveryAddress,
         subTotal,
         tax: staticTax,
+        cgst,
+        sgst,
         deliveryFee: staticDeliveryFee,
         totalAmount,
         status: OrderStatus.PENDING,
@@ -159,9 +164,17 @@ export class OrdersService {
       
       // Notify Restaurant Owners about NEW order
       for (const order of createdOrders) {
-        const restaurant = await this.restaurantModel.findById(order.restaurantId).exec();
+        const restaurant = await this.restaurantModel.findById(order.restaurantId).populate('ownerId').exec();
         if (restaurant && restaurant.ownerId) {
-          await this.notificationsService.sendToUser(restaurant.ownerId.toString(), {
+          const owner = restaurant.ownerId as any;
+          
+          // Socket.io real-time update
+          if (owner.firebaseUid) {
+            this.socketsGateway.emitNewOrder(owner.firebaseUid, order.toJSON ? order.toJSON() : order);
+          }
+
+          // Push Notification
+          await this.notificationsService.sendToUser(owner._id.toString(), {
             title: 'New Order Received! 🍔',
             body: `You have a new order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount}`,
             data: { orderId: order._id.toString(), type: 'NEW_ORDER' }
@@ -174,9 +187,17 @@ export class OrdersService {
 
     // Notify Restaurant Owners about NEW COD order
     for (const order of createdOrders) {
-      const restaurant = await this.restaurantModel.findById(order.restaurantId).exec();
+      const restaurant = await this.restaurantModel.findById(order.restaurantId).populate('ownerId').exec();
       if (restaurant && restaurant.ownerId) {
-        await this.notificationsService.sendToUser(restaurant.ownerId.toString(), {
+        const owner = restaurant.ownerId as any;
+
+        // Socket.io real-time update
+        if (owner.firebaseUid) {
+          this.socketsGateway.emitNewOrder(owner.firebaseUid, order.toJSON ? order.toJSON() : order);
+        }
+
+        // Push Notification
+        await this.notificationsService.sendToUser(owner._id.toString(), {
           title: 'New COD Order Received! 💵',
           body: `New COD order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount}`,
           data: { orderId: order._id.toString(), type: 'NEW_ORDER' }
@@ -195,12 +216,51 @@ export class OrdersService {
   }
 
   async getRestaurantOrders(restaurantId: string): Promise<Order[]> {
-    return this.orderModel.find({ restaurantId: new Types.ObjectId(restaurantId) }).sort({ createdAt: -1 }).exec();
+    return this.orderModel.find({ restaurantId: new Types.ObjectId(restaurantId) })
+      .populate('userId', 'name phone email')
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
+  async getVendorOrders(ownerId: string, page: number = 1, limit: number = 20): Promise<any> {
+    const skip = (page - 1) * limit;
+    
+    // 1. Find all restaurants owned by the vendor
+    const restaurants = await this.restaurantModel.find({ ownerId: new Types.ObjectId(ownerId) }).select('_id').exec();
+    const restaurantIds = restaurants.map(r => r._id);
+
+    if (restaurantIds.length === 0) {
+      return { data: [], totalItems: 0, totalPages: 0, currentPage: page };
+    }
+
+    // 2. Find orders for these restaurants
+    const baseMatch = { restaurantId: { $in: restaurantIds } };
+    
+    const [data, totalItems] = await Promise.all([
+      this.orderModel.find(baseMatch)
+        .populate('restaurantId', 'name logo address')
+        .populate('userId', 'name phone email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.orderModel.countDocuments(baseMatch).exec()
+    ]);
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data,
+      totalItems,
+      totalPages,
+      currentPage: page
+    };
   }
 
   async getOrderById(id: string): Promise<Order> {
     const order = await this.orderModel.findById(id)
       .populate('restaurantId', 'name logo coverImages rating address')
+      .populate('userId', 'name phone email')
       .exec();
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
@@ -219,10 +279,19 @@ export class OrdersService {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
     
-    // Emit order status update via websockets
+    // 1. Emit to dynamic order room (for active detail screens)
     this.socketsGateway.emitOrderStatus(id, updateOrderStatusDto.status);
 
-    // Notify Customer about Status Change
+    // 2. Emit to vendor room (to sync list view across devices)
+    const restaurant = await this.restaurantModel.findById(order.restaurantId).populate('ownerId').exec();
+    if (restaurant && restaurant.ownerId) {
+      const owner = restaurant.ownerId as any;
+      if (owner.firebaseUid) {
+        this.socketsGateway.emitOrderStatusToVendor(owner.firebaseUid, id, updateOrderStatusDto.status);
+      }
+    }
+
+    // 3. Notify Customer about Status Change (Push Notification)
     await this.notificationsService.sendToUser(order.userId.toString(), {
       title: 'Order Update 🍕',
       body: `Your order status is now: ${updateOrderStatusDto.status}`,

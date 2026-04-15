@@ -6,9 +6,9 @@ class VariantDto {
   @IsNotEmpty()
   name: string;
 
-  @IsNumber()
+  @IsInt()
   @IsNotEmpty()
-  price: number;
+  price: number; // Stored in Paise (integers)
 }
 
 class AddonOptionDto {
@@ -16,9 +16,9 @@ class AddonOptionDto {
   @IsNotEmpty()
   name: string;
 
-  @IsNumber()
+  @IsInt()
   @IsNotEmpty()
-  price: number;
+  price: number; // Stored in Paise (integers)
 }
 
 class AddonGroupDto {
@@ -38,7 +38,7 @@ class AddonGroupDto {
   @IsOptional()
   minSelections?: number;
 
-  @IsNumber()
+  @IsInt()
   @IsOptional()
   maxSelections?: number;
 
@@ -66,13 +66,13 @@ export class CreateMenuItemDto {
   @IsOptional()
   description?: string;
 
-  @IsNumber()
+  @IsInt()
   @IsNotEmpty()
-  price: number;
+  price: number; // Stored in Paise (integers)
 
-  @IsNumber()
+  @IsInt()
   @IsOptional()
-  discountPrice?: number;
+  discountPrice?: number; // Stored in Paise (integers)
 
   @IsString()
   @IsOptional()

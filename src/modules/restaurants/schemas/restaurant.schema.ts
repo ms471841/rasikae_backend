@@ -87,6 +87,12 @@ export class Restaurant {
 
   @Prop({ default: false })
   isPublished: boolean;
+
+  @Prop()
+  gstNumber?: string;
+
+  @Prop()
+  fssaiNumber?: string;
 }
 
 export const RestaurantSchema = SchemaFactory.createForClass(Restaurant);

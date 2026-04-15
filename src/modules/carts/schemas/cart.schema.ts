@@ -64,7 +64,7 @@ export class Cart {
   items: CartItem[];
 
   @Prop({ required: true, default: 0 })
-  totalPrice: number;
+  totalPrice: number; // Stored in Paise (integers)
 }
 
 export const CartSchema = SchemaFactory.createForClass(Cart);
