@@ -16,14 +16,10 @@ class AddressDto {
 
   @IsString()
   @IsNotEmpty()
-  zipCode: string;
+  postalCode: string;
 }
 
 export class CheckoutDto {
-  @IsMongoId()
-  @IsNotEmpty()
-  userId: string; // Temporarily passed in body until auth is fully integrated
-
   @ValidateNested()
   @Type(() => AddressDto)
   @IsNotEmpty()
@@ -32,4 +28,8 @@ export class CheckoutDto {
   @IsString()
   @IsNotEmpty()
   paymentMethod: string;
+
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey: string;
 }

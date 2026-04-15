@@ -27,6 +27,10 @@ export class ReviewsService {
       throw new NotFoundException(`Order not found`);
     }
 
+    if (order.isReviewed && targetType === TargetType.RESTAURANT) {
+      throw new BadRequestException('This order has already been reviewed.');
+    }
+
     // 2. Prevent duplicate reviews for the same target and order
     const existingReview = await this.reviewModel.findOne({
       orderId: new Types.ObjectId(orderId),
@@ -41,6 +45,12 @@ export class ReviewsService {
     // 3. Save the review
     const newReview = new this.reviewModel(createReviewDto);
     await newReview.save();
+
+    // 4. Mark order as reviewed if the target is a restaurant
+    if (targetType === TargetType.RESTAURANT) {
+      order.isReviewed = true;
+      await order.save();
+    }
 
     // 4. Update the Target Entity's Aggregate Rating concurrently
     let targetModel: Model<any>;

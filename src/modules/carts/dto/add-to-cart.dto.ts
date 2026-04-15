@@ -3,10 +3,6 @@ import { IsMongoId, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'clas
 export class AddToCartDto {
   @IsMongoId()
   @IsNotEmpty()
-  userId: string; // Temporary until we integrate with auth context
-
-  @IsMongoId()
-  @IsNotEmpty()
   menuItemId: string;
 
   @IsNumber()

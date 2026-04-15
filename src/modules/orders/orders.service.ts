@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument, OrderStatus, OrderItem } from './schemas/order.schema';
@@ -15,7 +16,7 @@ import { SocketsGateway } from '../sockets/sockets.gateway';
 import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
-import { TransactionType } from '../payments/schemas/transaction.schema';
+import { Transaction, TransactionDocument, TransactionType } from '../payments/schemas/transaction.schema';
 
 @Injectable()
 export class OrdersService {
@@ -23,6 +24,7 @@ export class OrdersService {
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
     @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
+    @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
     private readonly cartsService: CartsService,
     private readonly driversService: DriversService,
     private readonly walletsService: WalletsService,
@@ -30,10 +32,38 @@ export class OrdersService {
     private readonly paymentsService: PaymentsService,
     private readonly notificationsService: NotificationsService,
     private readonly settingsService: SettingsService,
+    private readonly configService: ConfigService,
   ) {}
 
-  async checkout(checkoutDto: CheckoutDto): Promise<{ orders: OrderDocument[], paymentData?: any }> {
-    const { userId, deliveryAddress, paymentMethod } = checkoutDto;
+  async checkout(userId: string, checkoutDto: CheckoutDto): Promise<{ orders: OrderDocument[], paymentData?: any }> {
+    const { deliveryAddress, paymentMethod, idempotencyKey } = checkoutDto;
+
+    // 1. Idempotency Check: Check if orders already exist for this key
+    const existingOrders = await this.orderModel.find({ userId: new Types.ObjectId(userId), idempotencyKey }).exec();
+    if (existingOrders.length > 0) {
+      // Find associated payment data if it's an online payment
+      let paymentData;
+      if (paymentMethod !== 'COD') {
+        const transaction = await this.transactionModel.findOne({ 
+          userId: new Types.ObjectId(userId),
+          $or: [
+            { orderId: { $in: existingOrders.map(o => o._id) } },
+            // Fallback for multicart where orderId might not be directly on transaction
+            // in some edge cases if we linked it differently
+          ]
+        }).sort({ createdAt: -1 }).exec();
+
+        if (transaction) {
+          paymentData = {
+            razorpayOrderId: transaction.razorpayOrderId,
+            amount: transaction.amount * 100, // paisa
+            currency: 'INR',
+            keyId: this.configService.get<string>('RAZORPAY_KEY_ID'),
+          };
+        }
+      }
+      return { orders: existingOrders, paymentData };
+    }
 
     // Check Global Settings (Maintenance Mode and Min Order Value)
     const settings = await this.settingsService.getSettings();
@@ -44,25 +74,33 @@ export class OrdersService {
     // Fetch the user's cart
     const cart = await this.cartsService.getCart(userId);
     if (!cart || cart.items.length === 0) {
+      // If order doesn't exist but cart is empty, it might have been cleared by a previous successful but unindexed/race-conditioned request
+      // But usually idempotency check above catches it.
       throw new BadRequestException('Cannot place an order with an empty cart');
     }
 
     // Group items by restaurant
     const itemsByRestaurant = new Map<string, any[]>();
     for (const item of cart.items) {
-      const restaurantIdStr = item.restaurantId.toString();
+      const restaurantIdStr = typeof item.restaurantId === 'object' && (item.restaurantId as any)._id 
+        ? (item.restaurantId as any)._id.toString() 
+        : item.restaurantId.toString();
+        
       let restaurantItems = itemsByRestaurant.get(restaurantIdStr);
       if (!restaurantItems) {
         restaurantItems = [];
         itemsByRestaurant.set(restaurantIdStr, restaurantItems);
       }
-      
+      const menuItemIdStr = typeof item.menuItemId === 'object' && (item.menuItemId as any)._id 
+        ? (item.menuItemId as any)._id.toString() 
+        : item.menuItemId.toString();
+
       // Fetch menu item name for the snapshot
-      const menuItem = await this.menuItemModel.findById(item.menuItemId).exec();
+      const menuItem = await this.menuItemModel.findById(menuItemIdStr).exec();
       const itemName = menuItem ? menuItem.name : 'Unknown Item';
 
       restaurantItems.push({
-        menuItemId: item.menuItemId,
+        menuItemId: new Types.ObjectId(menuItemIdStr),
         name: itemName,
         quantity: item.quantity,
         price: item.price,
@@ -98,6 +136,7 @@ export class OrdersService {
         status: OrderStatus.PENDING,
         paymentMethod,
         paymentStatus: 'PENDING',
+        idempotencyKey,
       };
 
       const createdOrder = new this.orderModel(orderData);
@@ -149,7 +188,10 @@ export class OrdersService {
   }
 
   async getUserOrders(userId: string): Promise<Order[]> {
-    return this.orderModel.find({ userId: new Types.ObjectId(userId) }).sort({ createdAt: -1 }).exec();
+    return this.orderModel.find({ userId: new Types.ObjectId(userId) })
+      .populate('restaurantId', 'name logo coverImages rating address')
+      .sort({ createdAt: -1 })
+      .exec();
   }
 
   async getRestaurantOrders(restaurantId: string): Promise<Order[]> {
@@ -157,7 +199,9 @@ export class OrdersService {
   }
 
   async getOrderById(id: string): Promise<Order> {
-    const order = await this.orderModel.findById(id).exec();
+    const order = await this.orderModel.findById(id)
+      .populate('restaurantId', 'name logo coverImages rating address')
+      .exec();
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }

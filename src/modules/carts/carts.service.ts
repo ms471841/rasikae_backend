@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Cart, CartDocument } from './schemas/cart.schema';
@@ -18,7 +18,17 @@ export class CartsService {
   }
 
   async getCart(userId: string): Promise<CartDocument> {
-    let cart = await this.cartModel.findOne({ userId }).exec();
+    let cart = await this.cartModel.findOne({ userId })
+      .populate({
+        path: 'items.menuItemId',
+        select: 'name price discountPrice image isVeg description'
+      })
+      .populate({
+        path: 'items.restaurantId',
+        select: 'name logo address rating'
+      })
+      .exec();
+
     if (!cart) {
       cart = new this.cartModel({ userId, items: [], totalPrice: 0 });
       await cart.save();
@@ -26,8 +36,8 @@ export class CartsService {
     return cart;
   }
 
-  async addToCart(addToCartDto: AddToCartDto): Promise<Cart> {
-    const { userId, menuItemId, quantity, variantName, addonNames } = addToCartDto;
+  async addToCart(userId: string, addToCartDto: AddToCartDto): Promise<Cart> {
+    const { menuItemId, quantity, variantName, addonNames } = addToCartDto;
 
     const menuItem = await this.menuItemModel.findById(menuItemId).exec();
     if (!menuItem) {
@@ -35,6 +45,21 @@ export class CartsService {
     }
     if (!menuItem.isAvailable) {
       throw new BadRequestException('This item is currently unavailable');
+    }
+
+    const cart = await this.getCart(userId);
+
+    // Cross-Restaurant Validation
+    if (cart.items.length > 0) {
+      const existingRestaurantId = cart.items[0].restaurantId.toString();
+      if (existingRestaurantId !== menuItem.restaurantId.toString()) {
+        throw new ConflictException({
+          message: 'Your cart contains items from another restaurant.',
+          code: 'MIXED_RESTAURANT',
+          currentRestaurantId: existingRestaurantId,
+          newRestaurantId: menuItem.restaurantId.toString(),
+        });
+      }
     }
 
     let variantPrice = 0;
@@ -81,8 +106,6 @@ export class CartsService {
     const basePrice = menuItem.discountPrice || menuItem.price;
     const totalItemPrice = (basePrice + variantPrice + addonsPrice) * quantity;
 
-    const cart = await this.getCart(userId);
-
     // Check if exactly same item configuration exists to just increment quantity
     const existingItemIndex = cart.items.findIndex(item => {
       const sameMenuItem = item.menuItemId.toString() === menuItemId;
@@ -107,15 +130,15 @@ export class CartsService {
         variant: selectedVariant,
         addons: selectedAddons,
         totalItemPrice,
-      } as any); // Cast as any to bypass Types.ObjectId constructor for the union type
+      } as any);
     }
 
     cart.totalPrice = this.calculateCartTotal(cart);
     return cart.save();
   }
 
-  async updateCartItem(itemId: string, updateCartItemDto: UpdateCartItemDto): Promise<Cart> {
-    const { userId, quantity } = updateCartItemDto;
+  async updateCartItem(userId: string, itemId: string, updateCartItemDto: UpdateCartItemDto): Promise<Cart> {
+    const { quantity } = updateCartItemDto;
     const cart = await this.cartModel.findOne({ userId }).exec();
     if (!cart) {
       throw new NotFoundException('Cart not found');
@@ -127,7 +150,7 @@ export class CartsService {
     }
 
     const item = cart.items[itemIndex];
-    const singleUnitPrice = item.totalItemPrice / item.quantity; // Best way to retrieve the unit price including variants/addons
+    const singleUnitPrice = item.totalItemPrice / item.quantity;
     
     item.quantity = quantity;
     item.totalItemPrice = singleUnitPrice * quantity;

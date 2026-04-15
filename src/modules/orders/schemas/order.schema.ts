@@ -24,7 +24,7 @@ export class Address {
   state: string;
 
   @Prop({ required: true })
-  zipCode: string;
+  postalCode: string;
 }
 
 const AddressSchema = SchemaFactory.createForClass(Address);
@@ -115,6 +115,12 @@ export class Order {
 
   @Prop({ required: true, default: 'PENDING' })
   paymentStatus: string;
+
+  @Prop({ default: false })
+  isReviewed: boolean;
+
+  @Prop({ required: false, index: true })
+  idempotencyKey?: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

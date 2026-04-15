@@ -11,7 +11,13 @@ export class SearchService {
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
   ) {}
 
-  async searchAll(query: string, lat?: number, lng?: number, maxDistance: number = 20000) {
+  async searchAll(
+    query: string,
+    lat?: number,
+    lng?: number,
+    filters?: { isVeg?: boolean; minRating?: number },
+    maxDistance: number = 20000,
+  ) {
     // Escape regex to prevent injection
     const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const qRegex = new RegExp(safeQuery, 'i');
@@ -20,14 +26,18 @@ export class SearchService {
     let restaurants = [];
     
     // Base match for restaurants: Approved and Published
-    const restMatch = {
+    const restMatch: any = {
       status: 'approved',
       isPublished: true,
-      $or: [
-        { name: qRegex },
-        { description: qRegex }
-      ]
+      $or: [{ name: qRegex }, { description: qRegex }],
     };
+
+    if (filters?.isVeg !== undefined) {
+      restMatch.isVeg = filters.isVeg;
+    }
+    if (filters?.minRating !== undefined) {
+      restMatch.rating = { $gte: filters.minRating };
+    }
 
     // If coordinates are provided, do a geospatial search
     if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
@@ -49,13 +59,17 @@ export class SearchService {
     }
 
     // Search Menu Items
-    const items = await this.menuItemModel.find({
+    const itemMatch: any = {
       isAvailable: true,
-      $or: [
-        { name: qRegex },
-        { description: qRegex }
-      ]
-    })
+      $or: [{ name: qRegex }, { description: qRegex }],
+    };
+
+    if (filters?.isVeg !== undefined) {
+      itemMatch.isVeg = filters.isVeg;
+    }
+
+    const items = await this.menuItemModel
+      .find(itemMatch)
     .populate({
         path: 'restaurantId',
         match: { status: 'approved', isPublished: true },

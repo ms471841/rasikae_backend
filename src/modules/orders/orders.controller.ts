@@ -1,56 +1,48 @@
-import { Controller, Get, Post, Body, Patch, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CheckoutDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { AssignDriverDto } from './dto/assign-driver.dto';
-import { MarkDeliveredDto } from './dto/mark-delivered.dto';
+import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
+import { CurrUser } from '../auth/decorators/user.decorator';
 
 @Controller('orders')
+@UseGuards(FirebaseAuthGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post('checkout')
-  @HttpCode(HttpStatus.CREATED)
-  checkout(@Body() checkoutDto: CheckoutDto) {
-    return this.ordersService.checkout(checkoutDto);
+  create(@CurrUser() user: any, @Body() checkoutDto: CheckoutDto) {
+    return this.ordersService.checkout(user._id.toString(), checkoutDto);
   }
 
-  @Get('user/:userId')
-  getUserOrders(@Param('userId') userId: string) {
-    return this.ordersService.getUserOrders(userId);
+  @Get('my-orders')
+  findAll(@CurrUser() user: any) {
+    return this.ordersService.getUserOrders(user._id.toString());
   }
 
   @Get('restaurant/:restaurantId')
-  getRestaurantOrders(@Param('restaurantId') restaurantId: string) {
+  findRestaurantOrders(@Param('restaurantId') restaurantId: string) {
     return this.ordersService.getRestaurantOrders(restaurantId);
   }
 
   @Get(':id')
-  getOrderById(@Param('id') id: string) {
+  findOne(@Param('id') id: string) {
     return this.ordersService.getOrderById(id);
   }
 
   @Patch(':id/status')
-  updateOrderStatus(@Param('id') id: string, @Body() updateOrderStatusDto: UpdateOrderStatusDto) {
-    // Note: Vendor or Admin typically calls this to flow PENDING -> ACCEPTED -> PREPARING
+  update(@Param('id') id: string, @Body() updateOrderStatusDto: UpdateOrderStatusDto) {
     return this.ordersService.updateOrderStatus(id, updateOrderStatusDto);
   }
 
-  @Post(':id/assign-driver')
-  @HttpCode(HttpStatus.OK)
+  @Patch(':id/assign-driver')
   assignDriver(@Param('id') id: string, @Body() assignDriverDto: AssignDriverDto) {
     return this.ordersService.assignDriver(id, assignDriverDto);
   }
 
-  @Patch(':id/deliver')
-  @HttpCode(HttpStatus.OK)
-  markDelivered(@Param('id') id: string, @Body() markDeliveredDto: MarkDeliveredDto) {
-    return this.ordersService.markDelivered(id, markDeliveredDto.driverId);
-  }
-
   @Post(':id/auto-assign')
-  @HttpCode(HttpStatus.OK)
-  autoAssignDriver(@Param('id') id: string) {
+  autoAssign(@Param('id') id: string) {
     return this.ordersService.autoAssignDriver(id);
   }
 }

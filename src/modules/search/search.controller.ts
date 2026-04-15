@@ -10,6 +10,8 @@ export class SearchController {
     @Query('q') query: string,
     @Query('lat') lat?: string,
     @Query('lng') lng?: string,
+    @Query('isVeg') isVeg?: string,
+    @Query('minRating') minRating?: string,
   ) {
     if (!query) {
       throw new BadRequestException('Search query "q" is required');
@@ -17,7 +19,12 @@ export class SearchController {
 
     const parsedLat = lat ? parseFloat(lat) : undefined;
     const parsedLng = lng ? parseFloat(lng) : undefined;
+    
+    const filters = {
+      isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
+      minRating: minRating ? parseFloat(minRating) : undefined,
+    };
 
-    return this.searchService.searchAll(query, parsedLat, parsedLng);
+    return this.searchService.searchAll(query, parsedLat, parsedLng, filters);
   }
 }
