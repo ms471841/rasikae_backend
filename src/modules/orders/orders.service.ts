@@ -342,20 +342,18 @@ export class OrdersService {
       data: { orderId: id, status: 'DRIVER_ASSIGNED' }
     });
 
-    // Notify Driver
-    await this.notificationsService.sendToUser(driverId, {
+    // Notify Driver (Corrected to use userId from populated driver)
+    const driverUserId = (driver.userId as any)._id?.toString() || driver.userId.toString();
+    await this.notificationsService.sendToUser(driverUserId, {
       title: 'New Delivery Assigned! 📦',
       body: `You have a new delivery at ${order.deliveryAddress.street}, ${order.deliveryAddress.city}`,
       data: { orderId: id, type: 'NEW_DELIVERY' }
     });
     
     // Live Socket sync
-    const populatedDriver = await this.driversService.findOne(driverId);
-    if (populatedDriver && populatedDriver.userId) {
-      const driverUser = populatedDriver.userId as any;
-      if (driverUser.firebaseUid) {
-        this.socketsGateway.emitNewOrderToDriver(driverUser.firebaseUid, order);
-      }
+    const driverUser = driver.userId as any;
+    if (driverUser && driverUser.firebaseUid) {
+      this.socketsGateway.emitNewOrderToDriver(driverUser.firebaseUid, order);
     }
 
     return order;
@@ -443,7 +441,8 @@ export class OrdersService {
     });
 
     // Notify Driver
-    await this.notificationsService.sendToUser(matchedDriverId, {
+    const driverUserId = (matchedDriver.userId as any)._id?.toString() || matchedDriver.userId.toString();
+    await this.notificationsService.sendToUser(driverUserId, {
       title: 'Auto-Assigned New Delivery! 📦',
       body: `Nearby delivery assigned at ${order.deliveryAddress.street}`,
       data: { orderId: id, type: 'NEW_DELIVERY' }

@@ -26,6 +26,9 @@ export class Address {
 
   @Prop({ required: true })
   postalCode: string;
+
+  @Prop({ type: { lat: Number, lng: Number }, _id: false })
+  geo?: { lat: number; lng: number };
 }
 
 const AddressSchema = SchemaFactory.createForClass(Address);

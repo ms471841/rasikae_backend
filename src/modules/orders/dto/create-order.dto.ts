@@ -17,6 +17,8 @@ class AddressDto {
   @IsString()
   @IsNotEmpty()
   postalCode: string;
+
+  geo?: { lat: number; lng: number };
 }
 
 export class CheckoutDto {
