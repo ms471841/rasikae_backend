@@ -222,6 +222,17 @@ export class OrdersService {
       .exec();
   }
 
+  async getDriverOrders(driverId: string): Promise<Order[]> {
+    return this.orderModel.find({ 
+      driverId: new Types.ObjectId(driverId),
+      status: { $in: [OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY] }
+    })
+    .populate('restaurantId', 'name logo address phone')
+    .populate('userId', 'name phone email')
+    .sort({ createdAt: -1 })
+    .exec();
+  }
+
   async getVendorOrders(ownerId: string, page: number = 1, limit: number = 20): Promise<any> {
     const skip = (page - 1) * limit;
     
@@ -338,6 +349,15 @@ export class OrdersService {
       data: { orderId: id, type: 'NEW_DELIVERY' }
     });
     
+    // Live Socket sync
+    const populatedDriver = await this.driversService.findOne(driverId);
+    if (populatedDriver && populatedDriver.userId) {
+      const driverUser = populatedDriver.userId as any;
+      if (driverUser.firebaseUid) {
+        this.socketsGateway.emitNewOrderToDriver(driverUser.firebaseUid, order);
+      }
+    }
+
     return order;
   }
 

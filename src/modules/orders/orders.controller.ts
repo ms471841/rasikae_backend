@@ -7,12 +7,15 @@ import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { CurrUser } from '../auth/decorators/user.decorator';
 import { UsersService } from '../users/users.service';
 
+import { DriversService } from '../drivers/drivers.service';
+
 @Controller('orders')
 @UseGuards(FirebaseAuthGuard)
 export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
     private readonly usersService: UsersService,
+    private readonly driversService: DriversService,
   ) {}
 
   @Post('checkout')
@@ -38,6 +41,13 @@ export class OrdersController {
     return this.ordersService.getVendorOrders(mongoUser._id.toString(), parsedPage, parsedLimit);
   }
 
+  @Get('driver/all')
+  async findDriverOrders(@CurrUser() user: any) {
+    const mongoUser = await this.usersService.getProfile(user.uid || user.firebaseUid);
+    const driver = await this.driversService.findByUserId(mongoUser._id.toString());
+    return this.ordersService.getDriverOrders(driver._id.toString());
+  }
+
   @Get('restaurant/:restaurantId')
   findRestaurantOrders(@Param('restaurantId') restaurantId: string) {
     return this.ordersService.getRestaurantOrders(restaurantId);
@@ -56,6 +66,13 @@ export class OrdersController {
   @Patch(':id/assign-driver')
   assignDriver(@Param('id') id: string, @Body() assignDriverDto: AssignDriverDto) {
     return this.ordersService.assignDriver(id, assignDriverDto);
+  }
+
+  @Patch(':id/delivered')
+  async markDelivered(@Param('id') id: string, @CurrUser() user: any) {
+    const mongoUser = await this.usersService.getProfile(user.uid || user.firebaseUid);
+    const driver = await this.driversService.findByUserId(mongoUser._id.toString());
+    return this.ordersService.markDelivered(id, driver._id.toString());
   }
 
   @Post(':id/auto-assign')
