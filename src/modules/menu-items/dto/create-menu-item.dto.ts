@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, IsArray, ValidateNested, IsMongoId } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, IsArray, ValidateNested, IsMongoId, IsInt } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class VariantDto {

@@ -1,6 +1,8 @@
 import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { DriversService } from '../drivers/drivers.service';
+import { OrdersService } from '../orders/orders.service';
+import { forwardRef, Inject } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
@@ -13,15 +15,14 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
   private lastUpdateMap = new Map<string, { time: number; lat: number; lng: number }>();
 
-  constructor(private readonly driversService: DriversService) {}
+  constructor(
+    private readonly driversService: DriversService,
+    @Inject(forwardRef(() => OrdersService))
+    private readonly ordersService: OrdersService,
+  ) {}
 
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
-    const orderId = client.handshake.query.orderId;
-    if (orderId) {
-      client.join(`order_${orderId}`);
-      console.log(`Client ${client.id} joined room: order_${orderId}`);
-    }
   }
 
   handleDisconnect(client: Socket) {
@@ -29,12 +30,35 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
   }
 
   @SubscribeMessage('joinOrderRoom')
-  handleJoinOrderRoom(
-    @MessageBody() data: { orderId: string },
+  async handleJoinOrderRoom(
+    @MessageBody() data: { orderId: string; uid?: string },
     @ConnectedSocket() client: Socket,
   ) {
-    client.join(`order_${data.orderId}`);
-    return { event: 'joinedRoom', data: `Joined order_${data.orderId}` };
+    try {
+      const order = await this.ordersService.getOrderById(data.orderId);
+      
+      // Basic security: Check if order belongs to user or is assigned to driver
+      // For now, if no uid, we allow (compatibility), but if uid is provided we check.
+      if (data.uid) {
+        const driver = await this.driversService.findByFirebaseUid(data.uid).catch(() => null);
+        const orderUserId = (order as any).userId?._id?.toString() || (order as any).userId?.toString();
+        const orderDriverId = (order as any).driverId?._id?.toString() || (order as any).driverId?.toString();
+        
+        const isOwner = order.userId && (order as any).userId.firebaseUid === data.uid;
+        const isAssignedDriver = driver && orderDriverId === driver._id.toString();
+
+        if (!isOwner && !isAssignedDriver) {
+          console.warn(`Unauthorized join attempt for order ${data.orderId} by uid ${data.uid}`);
+          return { event: 'error', data: 'Unauthorized' };
+        }
+      }
+
+      client.join(`order_${data.orderId}`);
+      console.log(`Client ${client.id} authorized for order_${data.orderId}`);
+      return { event: 'joinedRoom', data: `Joined order_${data.orderId}` };
+    } catch (error) {
+      return { event: 'error', data: 'Order not found' };
+    }
   }
 
   @SubscribeMessage('joinVendorRoom')

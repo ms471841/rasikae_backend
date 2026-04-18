@@ -13,6 +13,7 @@ import { SocketsModule } from '../sockets/sockets.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { UsersModule } from '../users/users.module';
 import { FirebaseModule } from '../firebase/firebase.module';
+import { forwardRef } from '@nestjs/common';
 
 @Module({
   imports: [
@@ -25,12 +26,13 @@ import { FirebaseModule } from '../firebase/firebase.module';
     CartsModule,
     DriversModule,
     WalletsModule,
-    SocketsModule,
+    forwardRef(() => SocketsModule),
     PaymentsModule,
     UsersModule,
     FirebaseModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],
+  exports: [OrdersService],
 })
 export class OrdersModule {}
