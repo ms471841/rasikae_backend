@@ -21,7 +21,7 @@ export class CartsService {
     let cart = await this.cartModel.findOne({ userId })
       .populate({
         path: 'items.menuItemId',
-        select: 'name price discountPrice image isVeg description'
+        select: 'name price discountPrice image isVeg description packagingChargeInPaise'
       })
       .populate({
         path: 'items.restaurantId',
@@ -51,13 +51,17 @@ export class CartsService {
 
     // Cross-Restaurant Validation
     if (cart.items.length > 0) {
-      const existingRestaurantId = cart.items[0].restaurantId.toString();
-      if (existingRestaurantId !== menuItem.restaurantId.toString()) {
+      // Handle potential population of restaurantId
+      const existingRestaurantId = (cart.items[0].restaurantId as any)._id?.toString() || 
+                                   cart.items[0].restaurantId.toString();
+      const newRestaurantId = menuItem.restaurantId.toString();
+
+      if (existingRestaurantId !== newRestaurantId) {
         throw new ConflictException({
           message: 'Your cart contains items from another restaurant.',
           code: 'MIXED_RESTAURANT',
           currentRestaurantId: existingRestaurantId,
-          newRestaurantId: menuItem.restaurantId.toString(),
+          newRestaurantId: newRestaurantId,
         });
       }
     }
@@ -103,12 +107,16 @@ export class CartsService {
       }
     }
 
-    const basePrice = menuItem.discountPrice || menuItem.price;
+    const basePrice = menuItem.price;
     const totalItemPrice = (basePrice + variantPrice + addonsPrice) * quantity;
 
     // Check if exactly same item configuration exists to just increment quantity
     const existingItemIndex = cart.items.findIndex(item => {
-      const sameMenuItem = item.menuItemId.toString() === menuItemId;
+      // Handle potential population of menuItemId
+      const itemMenuId = (item.menuItemId as any)._id?.toString() || 
+                         item.menuItemId.toString();
+      
+      const sameMenuItem = itemMenuId === menuItemId;
       const sameVariant = (item.variant?.name || null) === (selectedVariant?.name || null);
       const itemAddonNames = (item.addons || []).map(a => a.name).sort().join(',');
       const newAddonNames = selectedAddons.map(a => a.name).sort().join(',');
@@ -134,7 +142,26 @@ export class CartsService {
     }
 
     cart.totalPrice = this.calculateCartTotal(cart);
-    return cart.save();
+    await cart.save();
+    return this.getPopulatedCart(userId);
+  }
+
+  private async getPopulatedCart(userId: string): Promise<CartDocument> {
+    const cart = await this.cartModel.findOne({ userId })
+      .populate({
+        path: 'items.menuItemId',
+        select: 'name price discountPrice image isVeg description packagingChargeInPaise'
+      })
+      .populate({
+        path: 'items.restaurantId',
+        select: 'name logo address rating'
+      })
+      .exec();
+
+    if (!cart) {
+      throw new NotFoundException('Cart not found after update');
+    }
+    return cart;
   }
 
   async updateCartItem(userId: string, itemId: string, updateCartItemDto: UpdateCartItemDto): Promise<Cart> {
@@ -156,7 +183,8 @@ export class CartsService {
     item.totalItemPrice = singleUnitPrice * quantity;
 
     cart.totalPrice = this.calculateCartTotal(cart);
-    return cart.save();
+    await cart.save();
+    return this.getPopulatedCart(userId);
   }
 
   async removeItem(userId: string, itemId: string): Promise<Cart> {
@@ -167,7 +195,8 @@ export class CartsService {
 
     cart.items = cart.items.filter(i => i._id.toString() !== itemId);
     cart.totalPrice = this.calculateCartTotal(cart);
-    return cart.save();
+    await cart.save();
+    return this.getPopulatedCart(userId);
   }
 
   async clearCart(userId: string): Promise<void> {

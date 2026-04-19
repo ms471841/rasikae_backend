@@ -54,9 +54,15 @@ export class CreateMenuItemDto {
   @IsNotEmpty()
   restaurantId: string;
 
-  @IsMongoId()
+  @IsMongoId({ each: true })
+  @IsArray()
   @IsNotEmpty()
-  categoryId: string;
+  categoryIds: string[];
+
+  @IsMongoId({ each: true })
+  @IsArray()
+  @IsOptional()
+  cuisines?: string[];
 
   @IsString()
   @IsNotEmpty()
@@ -78,6 +84,10 @@ export class CreateMenuItemDto {
   @IsOptional()
   image?: string;
 
+  @IsString()
+  @IsOptional()
+  thumbnail?: string;
+
   @IsBoolean()
   @IsOptional()
   isAvailable?: boolean;
@@ -89,6 +99,19 @@ export class CreateMenuItemDto {
   @IsBoolean()
   @IsOptional()
   isSpicy?: boolean;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  spiceLevels?: string[];
+
+  @IsInt()
+  @IsOptional()
+  packagingChargeInPaise?: number;
+
+  @IsInt()
+  @IsOptional()
+  preparationTimeMinutes?: number;
 
   @IsArray()
   @ValidateNested({ each: true })

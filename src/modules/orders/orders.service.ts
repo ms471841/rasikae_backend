@@ -106,7 +106,9 @@ export class OrdersService {
         price: item.price,
         variant: item.variant,
         addons: item.addons,
+        packagingCharge: menuItem?.packagingChargeInPaise ?? 0,
         totalItemPrice: item.totalItemPrice,
+        originalPrice: menuItem?.discountPrice ?? item.price, // discountPrice is used as MRP/Original in this schema
       });
     }
 
@@ -125,7 +127,14 @@ export class OrdersService {
       const sgst = staticTax - cgst; // Remaining goes to SGST (handles odd paise)
 
       const staticDeliveryFee = settings.deliveryBaseFee;
-      const totalAmount = subTotal + staticTax + staticDeliveryFee;
+      const packagingFee = items.reduce((acc, current) => acc + (current.packagingCharge || 0) * current.quantity, 0);
+      
+      const discountAmount = items.reduce((acc, current) => {
+        const savings = (current.originalPrice > current.price) ? (current.originalPrice - current.price) * current.quantity : 0;
+        return acc + savings;
+      }, 0);
+
+      const totalAmount = subTotal + staticTax + staticDeliveryFee + packagingFee;
 
       const orderData = {
         userId: new Types.ObjectId(userId),
@@ -137,6 +146,8 @@ export class OrdersService {
         cgst,
         sgst,
         deliveryFee: staticDeliveryFee,
+        packagingFee,
+        discountAmount,
         totalAmount,
         status: OrderStatus.PENDING,
         paymentMethod,
@@ -283,7 +294,7 @@ export class OrdersService {
     const order = await this.orderModel.findByIdAndUpdate(
       id,
       { status: updateOrderStatusDto.status },
-      { new: true }
+      { returnDocument: 'after' }
     ).exec();
 
     if (!order) {

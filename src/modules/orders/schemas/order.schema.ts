@@ -114,6 +114,15 @@ export class Order {
   @Prop({ required: true, default: 0 })
   deliveryFee: number; // Stored in Paise (integers)
 
+  @Prop({ required: true, default: 0 })
+  packagingFee: number; // Stored in Paise (integers)
+
+  @Prop({ required: true, default: 0 })
+  discountAmount: number; // Stored in Paise (integers)
+
+  @Prop({ required: false })
+  couponCode?: string;
+
   @Prop({ required: true })
   totalAmount: number; // Stored in Paise (integers)
 

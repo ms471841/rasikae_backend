@@ -36,7 +36,7 @@ export class FavouriteRestaurantsService {
     const updatedUser = await this.userModel.findByIdAndUpdate(
       userId,
       updateQuery,
-      { new: true },
+      { returnDocument: 'after' },
     ).exec();
 
     if (!updatedUser) {

@@ -37,7 +37,7 @@ export class PromotionsService {
     const promotion = await this.promotionModel.findByIdAndUpdate(
       id,
       updatePromotionDto,
-      { new: true }
+      { returnDocument: 'after' },
     ).exec();
 
     if (!promotion) {

@@ -21,6 +21,14 @@ export class ReviewsService {
   async create(createReviewDto: CreateReviewDto): Promise<Review> {
     const { orderId, targetId, targetType, rating } = createReviewDto;
 
+    // 0. Validate ObjectIds
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new BadRequestException('Invalid Order ID format');
+    }
+    if (!Types.ObjectId.isValid(targetId)) {
+      throw new BadRequestException('Invalid Target ID format');
+    }
+
     // 1. Validate the order exists and is completed (DELIVERED)
     const order = await this.orderModel.findById(orderId).exec();
     if (!order) {

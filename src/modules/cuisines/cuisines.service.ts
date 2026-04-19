@@ -23,7 +23,7 @@ export class CuisinesService {
   }
 
   async update(id: string, updateCuisineDto: UpdateCuisineDto) {
-    const updated = await this.cuisineModel.findByIdAndUpdate(id, updateCuisineDto, { new: true }).exec();
+    const updated = await this.cuisineModel.findByIdAndUpdate(id, updateCuisineDto, { returnDocument: 'after' }).exec();
     if (!updated) {
       throw new NotFoundException(`Cuisine #${id} not found`);
     }

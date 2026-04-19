@@ -3,8 +3,8 @@ import { TargetType } from '../schemas/review.schema';
 
 export class CreateReviewDto {
   @IsMongoId()
-  @IsNotEmpty()
-  userId: string;
+  @IsOptional()
+  userId?: string;
 
   @IsMongoId()
   @IsNotEmpty()

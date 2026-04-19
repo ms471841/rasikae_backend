@@ -19,7 +19,7 @@ export class Settings {
   @Prop({ default: 'GLOBAL_CONFIG' })
   configId: string; // Used as a singleton key
 
-  @Prop({ default: 500 }) // Default 500 Paise (₹5)
+  @Prop({ default: 4000 }) // Default 4000 Paise (₹40)
   deliveryBaseFee: number;
 
   @Prop({ default: 0.05 })

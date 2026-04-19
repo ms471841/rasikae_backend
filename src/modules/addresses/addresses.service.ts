@@ -59,7 +59,7 @@ export class AddressesService {
     const address = await this.addressModel.findOneAndUpdate(
       { _id: id, userId: new Types.ObjectId(userId) },
       updateAddressDto,
-      { new: true }
+      { returnDocument: 'after' }
     ).exec();
 
     if (!address) {

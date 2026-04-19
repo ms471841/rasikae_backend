@@ -50,8 +50,11 @@ export class MenuItem {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true })
   restaurantId: mongoose.Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true })
-  categoryId: mongoose.Types.ObjectId;
+  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], default: [] })
+  categoryIds: mongoose.Types.ObjectId[];
+
+  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Cuisine' }], default: [] })
+  cuisines: mongoose.Types.ObjectId[];
 
   @Prop({ required: true })
   name: string;
@@ -68,6 +71,9 @@ export class MenuItem {
   @Prop()
   image?: string;
 
+  @Prop()
+  thumbnail?: string;
+
   @Prop({ default: true })
   isAvailable: boolean;
 
@@ -76,6 +82,15 @@ export class MenuItem {
 
   @Prop({ default: false })
   isSpicy: boolean;
+
+  @Prop({ type: [String], default: [] })
+  spiceLevels: string[];
+
+  @Prop({ default: 0 })
+  packagingChargeInPaise: number;
+
+  @Prop({ default: 0 })
+  preparationTimeMinutes: number;
 
   @Prop({ default: 0 })
   rating: number;

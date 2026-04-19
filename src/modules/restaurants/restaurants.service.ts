@@ -38,7 +38,7 @@ export class RestaurantsService {
 
     // Apply dynamic filters
     if (filters.minRating) baseMatch.rating = { $gte: filters.minRating };
-    if (filters.isVeg !== undefined) baseMatch.isVeg = filters.isVeg;
+    if (filters.isVeg === true) baseMatch.isVeg = true;
     if (filters.cuisines && filters.cuisines.length > 0) {
       baseMatch.cuisines = { $in: filters.cuisines.map(id => new mongoose.Types.ObjectId(id)) };
     }
@@ -53,7 +53,7 @@ export class RestaurantsService {
           $geoNear: {
             near: { type: 'Point', coordinates: [lng, lat] },
             distanceField: 'dist.calculated',
-            maxDistance: (filters.maxDistance || 20) * 1000, // Default 20km, converted to meters
+            maxDistance: (filters.maxDistance || 1000000) * 1000, // Large default for development
             query: baseMatch,
             spherical: true
           }
@@ -92,7 +92,7 @@ export class RestaurantsService {
     
     // Global filters for carousels
     if (filters.minRating) baseMatch.rating = { $gte: filters.minRating };
-    if (filters.isVeg !== undefined) baseMatch.isVeg = filters.isVeg;
+    if (filters.isVeg === true) baseMatch.isVeg = true;
     if (filters.cuisines && filters.cuisines.length > 0) {
       baseMatch.cuisines = { $in: filters.cuisines.map(id => new mongoose.Types.ObjectId(id)) };
     }
@@ -100,21 +100,36 @@ export class RestaurantsService {
       baseMatch.categories = new mongoose.Types.ObjectId(filters.categoryId);
     }
 
-    const trendingPromise = this.restaurantModel
-      .find(baseMatch)
-      .populate('categories cuisines')
-      .sort({ rating: -1, ratingCount: -1 })
-      .limit(5)
-      .lean()
-      .exec();
+    // Helper for carousel fetching with distance
+    const getCarouselData = async (sortPipe: any, additionalMatch: any = {}) => {
+      if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
+        return this.restaurantModel.aggregate([
+          {
+            $geoNear: {
+              near: { type: 'Point', coordinates: [lng, lat] },
+              distanceField: 'dist.calculated',
+              query: { ...baseMatch, ...additionalMatch },
+              spherical: true
+            }
+          },
+          { $sort: sortPipe },
+          { $limit: 5 },
+          { $lookup: { from: 'categories', localField: 'categories', foreignField: '_id', as: 'categories' } },
+          { $lookup: { from: 'cuisines', localField: 'cuisines', foreignField: '_id', as: 'cuisines' } }
+        ]).exec();
+      } else {
+        return this.restaurantModel
+          .find({ ...baseMatch, ...additionalMatch })
+          .populate('categories cuisines')
+          .sort(sortPipe)
+          .limit(5)
+          .lean()
+          .exec();
+      }
+    };
 
-    const recommendedPromise = this.restaurantModel
-      .find({ ...baseMatch, $or: [{ isFeatured: true }, { isFreeDelivery: true }] })
-      .populate('categories cuisines')
-      .sort({ rating: -1 })
-      .limit(5)
-      .lean()
-      .exec();
+    const trendingPromise = getCarouselData({ rating: -1, ratingCount: -1 });
+    const recommendedPromise = getCarouselData({ rating: -1 }, { $or: [{ isFeatured: true }, { isFreeDelivery: true }] });
 
     const [trending, recommended, allRestaurants] = await Promise.all([
       trendingPromise,
@@ -143,7 +158,7 @@ export class RestaurantsService {
 
   async update(id: string, updateRestaurantDto: UpdateRestaurantDto): Promise<Restaurant> {
     const existingRestaurant = await this.restaurantModel
-      .findByIdAndUpdate(id, updateRestaurantDto, { new: true })
+      .findByIdAndUpdate(id, updateRestaurantDto, { returnDocument: 'after' })
       .exec();
 
     if (!existingRestaurant) {

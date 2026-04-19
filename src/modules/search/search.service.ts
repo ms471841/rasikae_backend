@@ -2,13 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Restaurant, RestaurantDocument } from '../restaurants/schemas/restaurant.schema';
-import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
+
 
 @Injectable()
 export class SearchService {
   constructor(
     @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
-    @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
   ) {}
 
   async searchAll(
@@ -16,7 +15,7 @@ export class SearchService {
     lat?: number,
     lng?: number,
     filters?: { isVeg?: boolean; minRating?: number },
-    maxDistance: number = 20000,
+    maxDistance: number = 1000000, // Increased to 1,000km for development discovery
   ) {
     // Escape regex to prevent injection
     const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -32,8 +31,8 @@ export class SearchService {
       $or: [{ name: qRegex }, { description: qRegex }],
     };
 
-    if (filters?.isVeg !== undefined) {
-      restMatch.isVeg = filters.isVeg;
+    if (filters?.isVeg === true) {
+      restMatch.isVeg = true;
     }
     if (filters?.minRating !== undefined) {
       restMatch.rating = { $gte: filters.minRating };
@@ -46,45 +45,23 @@ export class SearchService {
           $geoNear: {
             near: { type: 'Point', coordinates: [lng, lat] },
             distanceField: 'dist.calculated',
-            maxDistance: maxDistance, // meters (e.g. 20km)
+            maxDistance: maxDistance,
             query: restMatch,
             spherical: true
           }
         },
-        { $limit: limit }
+        { $limit: limit },
+        { $lookup: { from: 'categories', localField: 'categories', foreignField: '_id', as: 'categories' } },
+        { $lookup: { from: 'cuisines', localField: 'cuisines', foreignField: '_id', as: 'cuisines' } }
       ]).exec();
     } else {
       // Fallback to standard text regex search
-      restaurants = await this.restaurantModel.find(restMatch).limit(limit).lean().exec();
+      restaurants = await this.restaurantModel.find(restMatch).populate('categories cuisines').limit(limit).lean().exec();
     }
-
-    // Search Menu Items
-    const itemMatch: any = {
-      isAvailable: true,
-      $or: [{ name: qRegex }, { description: qRegex }],
-    };
-
-    if (filters?.isVeg !== undefined) {
-      itemMatch.isVeg = filters.isVeg;
-    }
-
-    const items = await this.menuItemModel
-      .find(itemMatch)
-    .populate({
-        path: 'restaurantId',
-        match: { status: 'approved', isPublished: true },
-        select: 'name logo status isPublished'
-    })
-    .limit(limit)
-    .lean()
-    .exec();
-
-    // Filter out menu items that belong to unapproved/unpublished restaurants
-    const validItems = items.filter(item => item.restaurantId !== null);
 
     return {
       restaurants,
-      menuItems: validItems
+      menuItems: [] // Return empty for compatibility
     };
   }
 }

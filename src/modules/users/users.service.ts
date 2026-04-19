@@ -38,7 +38,7 @@ export class UsersService {
     const user = await this.userModel.findOneAndUpdate(
       { firebaseUid },
       { $set: dto },
-      { new: true },
+      { returnDocument: 'after' },
     ).exec();
     
     if (!user) {
@@ -60,7 +60,7 @@ export class UsersService {
     const user = await this.userModel.findOneAndUpdate(
       { firebaseUid },
       updateQuery,
-      { new: true },
+      { returnDocument: 'after' },
     ).exec();
 
     if (!user) {

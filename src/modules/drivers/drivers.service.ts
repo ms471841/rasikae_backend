@@ -74,7 +74,7 @@ export class DriversService {
     const driver = await this.driverModel.findByIdAndUpdate(
       id,
       { isAvailable: updateDriverStatusDto.isAvailable },
-      { new: true }
+      { returnDocument: 'after' }
     ).exec();
 
     if (!driver) {
@@ -92,7 +92,7 @@ export class DriversService {
           coordinates: updateLocationDto.coordinates
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     ).exec();
 
     if (!driver) {

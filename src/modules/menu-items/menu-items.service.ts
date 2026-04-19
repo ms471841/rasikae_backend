@@ -17,11 +17,21 @@ export class MenuItemsService {
     const createdMenuItem = new this.menuItemModel(createMenuItemDto);
     const savedItem = await createdMenuItem.save();
 
-    // Sync Category to Restaurant
-    await this.restaurantModel.findByIdAndUpdate(
-      savedItem.restaurantId,
-      { $addToSet: { categories: savedItem.categoryId } }
-    ).exec();
+    // Sync Categories & Cuisines to Restaurant
+    const updateOps: any = {};
+    if (savedItem.categoryIds && savedItem.categoryIds.length > 0) {
+      updateOps.categories = { $each: savedItem.categoryIds };
+    }
+    if (savedItem.cuisines && savedItem.cuisines.length > 0) {
+      updateOps.cuisines = { $each: savedItem.cuisines };
+    }
+
+    if (Object.keys(updateOps).length > 0) {
+      await this.restaurantModel.findByIdAndUpdate(
+        savedItem.restaurantId,
+        { $addToSet: updateOps }
+      ).exec();
+    }
 
     return savedItem;
   }
@@ -45,7 +55,7 @@ export class MenuItemsService {
 
     const data = await this.menuItemModel
       .find(query)
-      .populate('categoryId')
+      .populate('categoryIds')
       .skip(skip)
       .limit(limit)
       .exec();
@@ -64,7 +74,7 @@ export class MenuItemsService {
   async getGroupedMenuByRestaurant(id: string): Promise<any[]> {
     const allItems = await this.menuItemModel
       .find({ restaurantId: id, isAvailable: true })
-      .populate('categoryId')
+      .populate('categoryIds')
       .lean()
       .exec();
 
@@ -85,11 +95,22 @@ export class MenuItemsService {
 
     // Group the rest
     for (const item of allItems) {
-      const categoryName = (item.categoryId as any)?.name || 'Other';
-      if (!groupedMap.has(categoryName)) {
-        groupedMap.set(categoryName, []);
+      const categories = (item.categoryIds as any[]) || [];
+      if (categories.length === 0) {
+        const categoryName = 'Other';
+        if (!groupedMap.has(categoryName)) {
+          groupedMap.set(categoryName, []);
+        }
+        groupedMap.get(categoryName)!.push(item);
+      } else {
+        for (const cat of categories) {
+          const categoryName = cat?.name || 'Other';
+          if (!groupedMap.has(categoryName)) {
+            groupedMap.set(categoryName, []);
+          }
+          groupedMap.get(categoryName)!.push(item);
+        }
       }
-      groupedMap.get(categoryName)!.push(item);
     }
 
     // Convert Map to Array of Objects for easier consumption in Flutter
@@ -114,23 +135,53 @@ export class MenuItemsService {
     }
 
     const updatedMenuItem = await this.menuItemModel
-      .findByIdAndUpdate(id, updateMenuItemDto, { new: true })
+      .findByIdAndUpdate(id, updateMenuItemDto, { returnDocument: 'after' })
       .exec();
 
     if (!updatedMenuItem) {
       throw new NotFoundException(`MenuItem with ID ${id} not found`);
     }
 
-    // If category changed, sync both old and new
-    if (updateMenuItemDto.categoryId && oldItem.categoryId.toString() !== updateMenuItemDto.categoryId.toString()) {
-      // Add new
+    // --- Sync Restaurant Categories & Cuisines ---
+    const restaurantId = updatedMenuItem.restaurantId.toString();
+
+    // 1. Handle Categories
+    if (updateMenuItemDto.categoryIds) {
+      // Add newly selected categories
       await this.restaurantModel.findByIdAndUpdate(
-        updatedMenuItem.restaurantId,
-        { $addToSet: { categories: updatedMenuItem.categoryId } }
+        restaurantId,
+        { $addToSet: { categories: { $each: updatedMenuItem.categoryIds } } }
       ).exec();
 
-      // Check if we should remove old
-      await this.syncRestaurantCategories(oldItem.restaurantId.toString(), oldItem.categoryId.toString());
+      // Cleanup old categories that are no longer present in the item
+      const removedCats = oldItem.categoryIds.filter(catId => 
+        !updatedMenuItem.categoryIds.some(newId => newId.toString() === catId.toString())
+      );
+      
+      for (const catId of removedCats) {
+        await this.syncRestaurantCategories(restaurantId, catId.toString());
+      }
+    }
+
+    // 2. Handle Cuisines
+    if (updateMenuItemDto.cuisines) {
+      // Add newly selected cuisines
+      await this.restaurantModel.findByIdAndUpdate(
+        restaurantId,
+        { $addToSet: { cuisines: { $each: updatedMenuItem.cuisines } } }
+      ).exec();
+
+      // Cleanup old cuisines
+      const oldCuisines = oldItem.cuisines || [];
+      const newCuisines = updatedMenuItem.cuisines || [];
+      
+      const removedCuisines = oldCuisines.filter(cId => 
+        !newCuisines.some(newId => newId.toString() === cId.toString())
+      );
+
+      for (const cId of removedCuisines) {
+        await this.syncRestaurantCuisines(restaurantId, cId.toString());
+      }
     }
 
     return updatedMenuItem;
@@ -142,11 +193,21 @@ export class MenuItemsService {
       throw new NotFoundException(`MenuItem with ID ${id} not found`);
     }
 
-    // Cleanup Category from Restaurant if no items left
-    await this.syncRestaurantCategories(
-      deletedMenuItem.restaurantId.toString(),
-      deletedMenuItem.categoryId.toString()
-    );
+    const restaurantId = deletedMenuItem.restaurantId.toString();
+
+    // Cleanup Categories
+    if (deletedMenuItem.categoryIds) {
+      for (const catId of deletedMenuItem.categoryIds) {
+        await this.syncRestaurantCategories(restaurantId, catId.toString());
+      }
+    }
+
+    // Cleanup Cuisines
+    if (deletedMenuItem.cuisines) {
+      for (const cuisineId of deletedMenuItem.cuisines) {
+        await this.syncRestaurantCuisines(restaurantId, cuisineId.toString());
+      }
+    }
 
     return deletedMenuItem;
   }
@@ -154,13 +215,27 @@ export class MenuItemsService {
   private async syncRestaurantCategories(restaurantId: string, categoryId: string) {
     const count = await this.menuItemModel.countDocuments({
       restaurantId,
-      categoryId,
+      categoryIds: categoryId,
     }).exec();
 
     if (count === 0) {
       await this.restaurantModel.findByIdAndUpdate(
         restaurantId,
         { $pull: { categories: categoryId } }
+      ).exec();
+    }
+  }
+
+  private async syncRestaurantCuisines(restaurantId: string, cuisineId: string) {
+    const count = await this.menuItemModel.countDocuments({
+      restaurantId,
+      cuisines: cuisineId,
+    }).exec();
+
+    if (count === 0) {
+      await this.restaurantModel.findByIdAndUpdate(
+        restaurantId,
+        { $pull: { cuisines: cuisineId } }
       ).exec();
     }
   }
