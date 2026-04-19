@@ -59,7 +59,9 @@ export class RestaurantsService {
           }
         },
         { $skip: skip },
-        { $limit: limit }
+        { $limit: limit },
+        { $lookup: { from: 'categories', localField: 'categories', foreignField: '_id', as: 'categories' } },
+        { $lookup: { from: 'cuisines', localField: 'cuisines', foreignField: '_id', as: 'cuisines' } }
       ]).exec();
     } else {
       data = await this.restaurantModel
