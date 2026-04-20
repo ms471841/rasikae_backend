@@ -1,8 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
 import { DriversService } from './drivers.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
+import { OnboardDriverDto } from './dto/onboard-driver.dto';
 import { UpdateDriverStatusDto } from './dto/update-driver-status.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
+import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('drivers')
 export class DriversController {
@@ -12,6 +16,14 @@ export class DriversController {
   @HttpCode(HttpStatus.CREATED)
   create(@Body() createDriverDto: CreateDriverDto) {
     return this.driversService.create(createDriverDto);
+  }
+
+  @Post('onboard')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  @HttpCode(HttpStatus.CREATED)
+  onboard(@Body() onboardDriverDto: OnboardDriverDto) {
+    return this.driversService.onboardDriver(onboardDriverDto);
   }
 
   @Get()

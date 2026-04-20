@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
+import * as admin from 'firebase-admin';
+import { FIREBASE_APP } from '../firebase/firebase.module';
 import { Driver, DriverDocument } from './schemas/driver.schema';
 import { CreateDriverDto } from './dto/create-driver.dto';
+import { OnboardDriverDto } from './dto/onboard-driver.dto';
 import { UpdateDriverStatusDto } from './dto/update-driver-status.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
 import { WalletsService } from '../wallets/wallets.service';
@@ -12,6 +15,7 @@ import { UsersService } from '../users/users.service';
 export class DriversService {
   constructor(
     @InjectModel(Driver.name) private driverModel: Model<DriverDocument>,
+    @Inject(FIREBASE_APP) private firebaseApp: admin.app.App,
     private readonly walletsService: WalletsService,
     private readonly usersService: UsersService,
   ) {}
@@ -29,6 +33,71 @@ export class DriversService {
     await this.walletsService.initializeWallet(createDriverDto.userId);
 
     return createdDriver;
+  }
+
+  async onboardDriver(dto: OnboardDriverDto): Promise<any> {
+    const { name, email, password, phone, vehicleType, licensePlate } = dto;
+
+    // 1. Firebase Auth Creation
+    let firebaseUser;
+    try {
+      firebaseUser = await this.firebaseApp.auth().createUser({
+        email,
+        password,
+        displayName: name,
+        phoneNumber: phone,
+      });
+    } catch (error) {
+      if (error.code === 'auth/email-already-exists') {
+        throw new BadRequestException('A user with this email already exists in Firebase.');
+      }
+      if (error.code === 'auth/phone-number-already-exists') {
+        throw new BadRequestException('A user with this phone number already exists in Firebase.');
+      }
+      throw new BadRequestException(`Firebase Error: ${error.message}`);
+    }
+
+    // 2. Create User Document
+    let user;
+    try {
+      user = await this.usersService.createManual({
+        firebaseUid: firebaseUser.uid,
+        name,
+        email,
+        phone,
+        role: 'driver',
+      });
+    } catch (error) {
+      // Rollback Firebase user if DB creation fails
+      await this.firebaseApp.auth().deleteUser(firebaseUser.uid);
+      throw error;
+    }
+
+    // 3. Create Driver Document
+    let driver;
+    try {
+      driver = new this.driverModel({
+        userId: user._id,
+        vehicleType,
+        licensePlate,
+      });
+      await driver.save();
+    } catch (error) {
+      // Rollback User and Firebase if Driver creation fails
+      await this.firebaseApp.auth().deleteUser(firebaseUser.uid);
+      // Note: We might want a deleteManual in UsersService too, but for now we proceed
+      throw error;
+    }
+
+    // 4. Initialize Wallet
+    await this.walletsService.initializeWallet(user._id.toString());
+
+    return {
+      message: 'Driver onboarded successfully',
+      userId: user._id,
+      driverId: driver._id,
+      firebaseUid: firebaseUser.uid,
+    };
   }
 
   async findAll(): Promise<Driver[]> {

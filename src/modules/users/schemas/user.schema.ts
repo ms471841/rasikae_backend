@@ -20,7 +20,7 @@ export class User {
   @Prop()
   avatarUrl?: string;
 
-  @Prop({ default: 'customer', enum: ['customer', 'admin','vendor'] })
+  @Prop({ default: 'customer', enum: ['customer', 'admin', 'vendor', 'driver'] })
   role: string;
 
   @Prop({ type: [String], default: [] })

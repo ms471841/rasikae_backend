@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CartsService } from './carts.service';
 import { CartsController } from './carts.controller';
@@ -14,7 +14,7 @@ import { UsersModule } from '../users/users.module';
       { name: MenuItem.name, schema: MenuItemSchema },
     ]),
     AuthModule,
-    UsersModule,
+    forwardRef(() => UsersModule),
   ],
   controllers: [CartsController],
   providers: [CartsService],

@@ -86,4 +86,8 @@ export class AddressesService {
 
     return address;
   }
+
+  async removeAllByUser(userId: string): Promise<void> {
+    await this.addressModel.deleteMany({ userId: new Types.ObjectId(userId) }).exec();
+  }
 }
