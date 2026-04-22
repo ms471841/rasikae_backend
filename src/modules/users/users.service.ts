@@ -9,6 +9,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateFcmTokenDto, FcmAction } from './dto/update-fcm-token.dto';
 import { Address, AddressDocument } from '../addresses/schemas/address.schema';
 import { Cart, CartDocument } from '../carts/schemas/cart.schema';
+import { Order, OrderDocument } from '../orders/schemas/order.schema';
 
 @Injectable()
 export class UsersService {
@@ -16,6 +17,7 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Address.name) private addressModel: Model<AddressDocument>,
     @InjectModel(Cart.name) private cartModel: Model<CartDocument>,
+    @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @Inject(FIREBASE_APP) private firebaseApp: admin.app.App,
   ) {}
 
@@ -118,5 +120,89 @@ export class UsersService {
   async createManual(data: Partial<User>): Promise<UserDocument> {
     const user = new this.userModel(data);
     return user.save();
+  }
+
+  async findAllAdmin(page: number = 1, limit: number = 20): Promise<any> {
+    const skip = (page - 1) * limit;
+
+    const [data, totalItems] = await Promise.all([
+      this.userModel.find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.userModel.countDocuments().exec()
+    ]);
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data,
+      totalItems,
+      totalPages,
+      currentPage: page
+    };
+  }
+
+  async updateStatus(uid: string, role: string): Promise<User> {
+    // Note: status is often handled by 'role' or a separate 'isBlocked' field.
+    // Assuming for now it's a simple role toggle or we can add 'isBlocked' to schema if needed.
+    // For this surprise, I'll update the profile.
+    const user = await this.userModel.findOneAndUpdate(
+      { $or: [{ _id: new Types.ObjectId(uid) }, { firebaseUid: uid }] },
+      { $set: { role } },
+      { returnDocument: 'after' }
+    ).exec();
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user;
+  }
+
+  async incrementUserStats(userId: string | Types.ObjectId, amountPaise: number): Promise<void> {
+    const id = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
+    await this.userModel.updateOne(
+      { _id: id },
+      { 
+        $inc: { 
+          totalOrders: 1, 
+          ltv: amountPaise 
+        },
+        $set: { 
+          lastOrderDate: new Date() 
+        }
+      }
+    ).exec();
+  }
+
+  async syncAllUserStats(): Promise<any> {
+    const aggregation = await this.orderModel.aggregate([
+      { $match: { status: 'DELIVERED' } },
+      {
+        $group: {
+          _id: '$userId',
+          totalOrders: { $sum: 1 },
+          ltv: { $sum: '$totalAmount' },
+          lastOrderDate: { $max: '$createdAt' }
+        }
+      }
+    ]).exec();
+
+    const updates = aggregation.map(stats => 
+      this.userModel.updateOne(
+        { _id: stats._id },
+        { 
+          $set: { 
+            totalOrders: stats.totalOrders,
+            ltv: stats.ltv,
+            lastOrderDate: stats.lastOrderDate
+          } 
+        }
+      ).exec()
+    );
+
+    await Promise.all(updates);
+    return { updatedCount: aggregation.length };
   }
 }

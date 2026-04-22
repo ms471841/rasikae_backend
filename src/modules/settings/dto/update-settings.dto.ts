@@ -36,6 +36,10 @@ export class UpdateSettingsDto {
   @IsOptional()
   appVersion?: string;
 
+  @IsNumber()
+  @IsOptional()
+  platformCommissionPercentage?: number;
+
   @ValidateNested()
   @Type(() => SupportContactDto)
   @IsOptional()

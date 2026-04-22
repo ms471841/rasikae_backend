@@ -1,7 +1,10 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { WalletsService } from './wallets.service';
-import { Body, Post } from '@nestjs/common';
+import { Body, Post, UseGuards } from '@nestjs/common';
 import { WithdrawDto } from './dto/withdraw.dto';
+import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('wallets')
 export class WalletsController {
@@ -30,5 +33,40 @@ export class WalletsController {
   @Post('restaurant/:restaurantId/withdraw')
   requestWithdraw(@Param('restaurantId') restaurantId: string, @Body() withdrawDto: WithdrawDto) {
     return this.walletsService.requestWithdrawal(restaurantId, withdrawDto);
+  }
+
+  @Get('admin/auditor')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  findAllWallets() {
+    return this.walletsService.findAllWallets();
+  }
+
+  @Get('admin/ledger')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  findAllTransactions() {
+    return this.walletsService.findAllTransactions();
+  }
+
+  @Post('admin/settle/:walletId')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  settleWallet(@Param('walletId') walletId: string) {
+    return this.walletsService.settleWallet(walletId);
+  }
+
+  @Get('admin/wallets/:walletId/transactions')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  findTransactionsByWallet(@Param('walletId') walletId: string) {
+    return this.walletsService.findTransactionsByWallet(walletId);
+  }
+
+  @Post('admin/settle-batch')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  settleBatch(@Body('walletIds') walletIds: string[]) {
+    return this.walletsService.settleBatch(walletIds);
   }
 }

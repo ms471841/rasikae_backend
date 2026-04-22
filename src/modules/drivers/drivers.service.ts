@@ -108,6 +108,10 @@ export class DriversService {
     return this.driverModel.find({ isAvailable: true }).populate('userId', 'firstName lastName phoneNumber').exec();
   }
 
+  async getFleet(): Promise<Driver[]> {
+    return this.driverModel.find({ currentLocation: { $exists: true } }).populate('userId', 'name firstName lastName phoneNumber').exec();
+  }
+
   async findNearbyAvailable(lng: number, lat: number, maxDistance: number): Promise<Driver[]> {
     return this.driverModel.find({
       isAvailable: true,

@@ -61,6 +61,47 @@ export class AnalyticsService {
     };
   }
 
+  async getWeeklyTrends() {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const trends = await this.orderModel.aggregate([
+      { 
+        $match: { 
+          createdAt: { $gte: sevenDaysAgo },
+          status: 'DELIVERED'
+        } 
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          revenue: { $sum: '$subTotal' },
+          orders: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // Fill gaps with zeros for a smooth chart
+    const result = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - i));
+      const dateString = date.toISOString().split('T')[0];
+      const match = trends.find(t => t._id === dateString);
+      
+      result.push({
+        date: dateString,
+        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        revenue: match ? match.revenue : 0,
+        orders: match ? match.orders : 0
+      });
+    }
+
+    return result;
+  }
+
   async getRestaurantDashboardStats(restaurantId: string) {
     if (!Types.ObjectId.isValid(restaurantId)) {
       throw new BadRequestException('Invalid restaurant identifier format');

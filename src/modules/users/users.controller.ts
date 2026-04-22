@@ -6,6 +6,9 @@ import { UpdateFcmTokenDto } from './dto/update-fcm-token.dto';
 import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { CurrUser } from '../auth/decorators/user.decorator';
 import type { DecodedIdToken } from 'firebase-admin/auth';
+import { Query, Param } from '@nestjs/common';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('users')
 @UseGuards(FirebaseAuthGuard)
@@ -55,5 +58,34 @@ export class UsersController {
   async deleteProfile(@CurrUser() user: any) {
     const uid = user.uid || user.firebaseUid;
     return this.usersService.deleteAccount(uid);
+  }
+
+  @Get('admin/all')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async findAllAdmin(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    return this.usersService.findAllAdmin(parsedPage, parsedLimit);
+  }
+
+  @Patch('admin/:id/status')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async updateStatus(
+    @Param('id') id: string,
+    @Body('role') role: string,
+  ) {
+    return this.usersService.updateStatus(id, role);
+  }
+
+  @Post('admin/sync-stats')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async syncStats() {
+    return this.usersService.syncAllUserStats();
   }
 }

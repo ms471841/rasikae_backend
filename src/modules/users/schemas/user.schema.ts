@@ -28,6 +28,15 @@ export class User {
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant' }], default: [] })
   favorites: mongoose.Types.ObjectId[];
+
+  @Prop({ default: 0 })
+  totalOrders: number;
+
+  @Prop({ default: 0 })
+  ltv: number; // Stored in Paise (integers)
+
+  @Prop()
+  lastOrderDate?: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

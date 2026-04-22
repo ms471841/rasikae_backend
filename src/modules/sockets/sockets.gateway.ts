@@ -82,6 +82,16 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     return { event: 'joinedRoom', data: `Joined driver_${data.uid}` };
   }
 
+  @SubscribeMessage('joinAdminRoom')
+  handleJoinAdminRoom(
+    @MessageBody() data: { token?: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.join(`admin`);
+    console.log(`Admin ${client.id} joined global operations stream.`);
+    return { event: 'joinedRoom', data: `Joined admin stream` };
+  }
+
   @SubscribeMessage('updateLocation')
   async handleUpdateLocation(
     @MessageBody() data: { orderId: string; lat: number; lng: number },
@@ -138,11 +148,13 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
   }
 
   emitOrderStatus(orderId: string, status: string) {
-    this.server.to(`order_${orderId}`).emit('orderStatusUpdated', {
+    const payload = {
       orderId,
       status,
       timestamp: new Date().toISOString(),
-    });
+    };
+    this.server.to(`order_${orderId}`).emit('orderStatusUpdated', payload);
+    this.server.to(`admin`).emit('orderStatusUpdated', payload);
   }
 
   emitOrderStatusToVendor(vendorId: string, orderId: string, status: string) {
@@ -154,10 +166,12 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
   }
 
   emitNewOrder(vendorId: string, order: any) {
-    this.server.to(`vendor_${vendorId}`).emit('newOrder', {
+    const payload = {
       order,
       timestamp: new Date().toISOString(),
-    });
+    };
+    this.server.to(`vendor_${vendorId}`).emit('newOrder', payload);
+    this.server.to(`admin`).emit('newAdminOrder', payload);
   }
 
   emitNewOrderToDriver(driverIdOrUid: string, order: any) {

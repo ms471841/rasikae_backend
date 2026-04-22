@@ -8,6 +8,8 @@ import { CurrUser } from '../auth/decorators/user.decorator';
 import { UsersService } from '../users/users.service';
 
 import { DriversService } from '../drivers/drivers.service';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('orders')
 @UseGuards(FirebaseAuthGuard)
@@ -28,6 +30,18 @@ export class OrdersController {
     return this.ordersService.getUserOrders(user._id.toString());
   }
 
+  @Get('all')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async findAllOrders(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedPage = Math.max(1, page ? parseInt(page, 10) : 1);
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    return this.ordersService.getAllOrders(parsedPage, parsedLimit);
+  }
+
   @Get('vendor/all')
   async findVendorOrders(
     @CurrUser() user: any,
@@ -36,7 +50,7 @@ export class OrdersController {
   ) {
     const uid = user.uid || user.firebaseUid;
     const mongoUser = await this.usersService.getProfile(uid);
-    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedPage = Math.max(1, page ? parseInt(page, 10) : 1);
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
     return this.ordersService.getVendorOrders(mongoUser._id.toString(), parsedPage, parsedLimit);
   }

@@ -15,6 +15,13 @@ export class AnalyticsController {
     return this.analyticsService.getGlobalStats();
   }
 
+  @Get('trends')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  getWeeklyTrends() {
+    return this.analyticsService.getWeeklyTrends();
+  }
+
   @Get('restaurant/:restaurantId')
   getRestaurantAnalytics(@Param('restaurantId') restaurantId: string) {
     return this.analyticsService.getRestaurantDashboardStats(restaurantId);

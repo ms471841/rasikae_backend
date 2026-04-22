@@ -8,6 +8,15 @@ export class Cuisine {
   @Prop({ required: true, unique: true })
   name: string;
 
+  @Prop()
+  description?: string;
+
+  @Prop()
+  image?: string;
+
+  @Prop({ type: [String], default: [] })
+  tags?: string[];
+
   @Prop({ default: true })
   isActive: boolean;
 }

@@ -17,6 +17,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { Transaction, TransactionDocument, TransactionType } from '../payments/schemas/transaction.schema';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class OrdersService {
@@ -33,6 +34,7 @@ export class OrdersService {
     private readonly notificationsService: NotificationsService,
     private readonly settingsService: SettingsService,
     private readonly configService: ConfigService,
+    private readonly usersService: UsersService,
   ) {}
 
   async checkout(userId: string, checkoutDto: CheckoutDto): Promise<{ orders: OrderDocument[], paymentData?: any }> {
@@ -281,7 +283,7 @@ export class OrdersService {
 
   async getOrderById(id: string): Promise<Order> {
     const order = await this.orderModel.findById(id)
-      .populate('restaurantId', 'name logo coverImages rating address')
+      .populate('restaurantId', 'name logo coverImages rating address location')
       .populate('userId', 'name phone email')
       .exec();
     if (!order) {
@@ -410,6 +412,9 @@ export class OrdersService {
       data: { orderId: id, status: 'DELIVERED' }
     });
 
+    // Update User Stats (Denormalization)
+    await this.usersService.incrementUserStats(order.userId, order.totalAmount);
+
     return order;
   }
 
@@ -463,6 +468,31 @@ export class OrdersService {
       order, 
       driverId: matchedDriverId,
       message: 'Driver successfully matched and auto-assigned!' 
+    };
+  }
+
+  async getAllOrders(page: number = 1, limit: number = 20): Promise<any> {
+    const skip = (page - 1) * limit;
+
+    const [data, totalItems] = await Promise.all([
+      this.orderModel.find()
+        .populate('restaurantId', 'name logo address')
+        .populate('userId', 'name phone email')
+        .populate('driverId')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.orderModel.countDocuments().exec()
+    ]);
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data,
+      totalItems,
+      totalPages,
+      currentPage: page
     };
   }
 }

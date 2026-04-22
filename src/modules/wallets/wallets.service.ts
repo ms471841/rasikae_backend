@@ -157,4 +157,70 @@ export class WalletsService {
     await new this.transactionModel(txData).save();
     return wallet.save();
   }
+
+  async findAllWallets(): Promise<Wallet[]> {
+    return this.walletModel.find()
+      .populate('userId', 'name email phone')
+      .populate('restaurantId', 'name address')
+      .sort({ availableBalance: -1 })
+      .exec();
+  }
+
+  async findAllTransactions(): Promise<Transaction[]> {
+    return this.transactionModel.find()
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .exec();
+  }
+
+  async settleWallet(walletId: string): Promise<WalletDocument> {
+    const wallet = await this.walletModel.findById(walletId).exec();
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    if (wallet.availableBalance <= 0) {
+      throw new BadRequestException('Wallet has no balance to settle');
+    }
+
+    const amountToSettle = wallet.availableBalance;
+
+    // Deduct the full amount
+    wallet.availableBalance = 0;
+
+    // Create withdrawal transaction record
+    const withdrawalTx = new this.transactionModel({
+      walletId: wallet._id,
+      amount: amountToSettle,
+      type: TransactionType.WITHDRAWAL,
+      description: `Manual Settlement: Admin Payout`,
+      createdAt: new Date(),
+    });
+
+    await withdrawalTx.save();
+    return wallet.save();
+  }
+
+  async findTransactionsByWallet(walletId: string): Promise<Transaction[]> {
+    return this.transactionModel.find({ walletId: new Types.ObjectId(walletId) })
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
+  async settleBatch(walletIds: string[]): Promise<{ success: string[], failed: string[] }> {
+    const success: string[] = [];
+    const failed: string[] = [];
+
+    for (const id of walletIds) {
+      try {
+        await this.settleWallet(id);
+        success.push(id);
+      } catch (error) {
+        console.error(`Failed to settle wallet ${id}:`, error);
+        failed.push(id);
+      }
+    }
+
+    return { success, failed };
+  }
 }

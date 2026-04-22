@@ -37,6 +37,9 @@ export class Settings {
   @Prop({ default: '1.0.0' })
   appVersion: string;
 
+  @Prop({ default: 0.10 }) // Default 10%
+  platformCommissionPercentage: number;
+
   @Prop({ type: SupportContactSchema, default: {} })
   supportContact: SupportContact;
 }

@@ -31,6 +31,13 @@ export class DriversController {
     return this.driversService.findAll();
   }
 
+  @Get('admin/fleet')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  getFleet() {
+    return this.driversService.getFleet();
+  }
+
   @Get('available')
   findAvailable() {
     return this.driversService.findAvailable();

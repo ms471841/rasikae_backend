@@ -9,6 +9,17 @@ export class CreateCategoryDto {
   @IsOptional()
   image?: string;
 
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsOptional()
+  color?: string;
+
+  @IsOptional()
+  sortOrder?: number;
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

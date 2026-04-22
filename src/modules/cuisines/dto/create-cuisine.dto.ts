@@ -5,6 +5,17 @@ export class CreateCuisineDto {
   @IsNotEmpty()
   name: string;
 
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsOptional()
+  image?: string;
+
+  @IsOptional()
+  tags?: string[];
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

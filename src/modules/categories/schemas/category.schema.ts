@@ -11,6 +11,15 @@ export class Category {
   @Prop()
   image?: string;
 
+  @Prop()
+  description?: string;
+
+  @Prop()
+  color?: string;
+
+  @Prop({ default: 0 })
+  sortOrder?: number;
+
   @Prop({ default: true })
   isActive: boolean;
 }

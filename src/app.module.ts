@@ -28,6 +28,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { SearchModule } from './modules/search/search.module';
 import { FavouriteRestaurantsModule } from './modules/favourite-restaurants/favourite-restaurants.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { FavouriteRestaurantsModule } from './modules/favourite-restaurants/favo
     SettingsModule,
     SearchModule,
     FavouriteRestaurantsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
