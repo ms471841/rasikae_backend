@@ -5,7 +5,7 @@ export type WalletDocument = Wallet & Document;
 
 @Schema({ timestamps: true })
 export class Wallet {
-  @Prop({ type: String, enum: ['DRIVER', 'RESTAURANT'], required: true, default: 'DRIVER' })
+  @Prop({ type: String, enum: ['DRIVER', 'RESTAURANT', 'PLATFORM'], required: true, default: 'DRIVER' })
   walletType: string;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User' })

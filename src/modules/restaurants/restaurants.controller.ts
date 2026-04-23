@@ -17,12 +17,20 @@ export class RestaurantsController {
   @UseGuards(FirebaseAuthGuard)
   async create(
     @CurrUser() user: any,
-    @Body() createRestaurantDto: CreateRestaurantDto,
+    @Body() createRestaurantDto: CreateRestaurantDto & { ownerId?: string },
   ) {
     const uid = user.uid || user.firebaseUid;
     const mongoUser = await this.usersService.getProfile(uid);
-    // Passing the MongoDB User _id as the ownerId
-    return this.restaurantsService.create(mongoUser._id.toString(), createRestaurantDto);
+    
+    // Default to the current user as owner
+    let targetOwnerId = mongoUser._id.toString();
+    
+    // If admin provides an ownerId, override it
+    if (mongoUser.role === 'admin' && createRestaurantDto.ownerId) {
+      targetOwnerId = createRestaurantDto.ownerId;
+    }
+    
+    return this.restaurantsService.create(targetOwnerId, createRestaurantDto);
   }
 
   @Get('home-feed')
@@ -62,6 +70,9 @@ export class RestaurantsController {
     @Query('isVeg') isVeg?: string,
     @Query('cuisines') cuisines?: string,
     @Query('categoryId') categoryId?: string,
+    @Query('status') status?: string,
+    @Query('isPublished') isPublished?: string,
+    @Query('search') search?: string,
   ) {
     const parsedPage = page ? parseInt(page, 10) : 1;
     const parsedLimit = limit ? parseInt(limit, 10) : 10;
@@ -74,6 +85,9 @@ export class RestaurantsController {
       isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
       cuisines: cuisines ? cuisines.split(',') : undefined,
       categoryId: categoryId,
+      status: status,
+      isPublished: isPublished === 'true' ? true : isPublished === 'false' ? false : undefined,
+      search: search,
     };
 
     return this.restaurantsService.findAll(parsedPage, parsedLimit, parsedLat, parsedLng, filters);

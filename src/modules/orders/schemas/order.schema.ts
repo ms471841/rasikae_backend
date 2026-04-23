@@ -21,11 +21,11 @@ export class Address {
   @Prop({ required: true })
   city: string;
 
-  @Prop({ required: true })
-  state: string;
+  @Prop({ required: false })
+  state?: string;
 
-  @Prop({ required: true })
-  postalCode: string;
+  @Prop({ required: false })
+  postalCode?: string;
 
   @Prop({ type: { lat: Number, lng: Number }, _id: false })
   geo?: { lat: number; lng: number };
@@ -140,6 +140,9 @@ export class Order {
 
   @Prop({ required: false, index: true })
   idempotencyKey?: string;
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

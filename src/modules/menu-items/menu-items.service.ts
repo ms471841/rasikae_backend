@@ -36,8 +36,46 @@ export class MenuItemsService {
     return savedItem;
   }
 
-  async findAll(): Promise<MenuItem[]> {
-    return this.menuItemModel.find().exec();
+  async findAll(
+    page: number = 1,
+    limit: number = 20,
+    filters: { search?: string; restaurantId?: string; isVeg?: boolean; isAvailable?: boolean } = {}
+  ): Promise<any> {
+    const skip = (page - 1) * limit;
+    const query: any = {};
+
+    if (filters.search) {
+      query.name = { $regex: filters.search, $options: 'i' };
+    }
+    if (filters.restaurantId) {
+      query.restaurantId = filters.restaurantId;
+    }
+    if (filters.isVeg !== undefined) {
+      query.isVeg = filters.isVeg;
+    }
+    if (filters.isAvailable !== undefined) {
+      query.isAvailable = filters.isAvailable;
+    }
+
+    const [data, totalItems] = await Promise.all([
+      this.menuItemModel.find(query)
+        .populate('restaurantId', 'name logo')
+        .populate('categoryIds cuisines')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.menuItemModel.countDocuments(query).exec()
+    ]);
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data,
+      totalItems,
+      totalPages,
+      currentPage: page,
+    };
   }
 
   async findByRestaurant(

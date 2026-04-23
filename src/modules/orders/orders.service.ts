@@ -183,6 +183,10 @@ export class OrdersService {
           
           // Socket.io real-time update
           if (owner.firebaseUid) {
+            await order.populate([
+              { path: 'restaurantId', select: 'name logo address' },
+              { path: 'userId', select: 'name phone email' }
+            ]);
             this.socketsGateway.emitNewOrder(owner.firebaseUid, order.toJSON ? order.toJSON() : order);
           }
 
@@ -206,6 +210,10 @@ export class OrdersService {
 
         // Socket.io real-time update
         if (owner.firebaseUid) {
+          await order.populate([
+            { path: 'restaurantId', select: 'name logo address' },
+            { path: 'userId', select: 'name phone email' }
+          ]);
           this.socketsGateway.emitNewOrder(owner.firebaseUid, order.toJSON ? order.toJSON() : order);
         }
 
@@ -372,13 +380,13 @@ export class OrdersService {
     return order;
   }
 
-  async markDelivered(id: string, driverId: string): Promise<Order> {
+  async markDelivered(id: string, driverId?: string): Promise<Order> {
     const order = await this.orderModel.findById(id).exec();
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
 
-    if (!order.driverId || order.driverId.toString() !== driverId) {
+    if (driverId && (!order.driverId || order.driverId.toString() !== driverId)) {
       throw new BadRequestException('You are not authorized to mark this order as delivered. Is it assigned to you?');
     }
 
@@ -387,22 +395,30 @@ export class OrdersService {
     }
 
     order.status = OrderStatus.DELIVERED;
+    if (order.paymentMethod === 'COD') {
+      order.paymentStatus = 'PAID';
+    }
     await order.save();
 
     // Trigger phase 2 earning mechanisms securely!
-    await this.walletsService.processDeliveryEarnings(
-      driverId, 
-      id, 
-      order.deliveryFee || 0, // Injected standard delivery cut 
-      order.totalAmount,     // Used if the payment is COD
-      order.paymentMethod
-    );
+    if (order.driverId || driverId) {
+      await this.walletsService.processDeliveryEarnings(
+        driverId || order.driverId!.toString(), 
+        id, 
+        order.deliveryFee || 0,
+        order.totalAmount,
+        order.paymentMethod
+      );
+    }
 
     // Trigger Admin/Platform commission and Restaurant Earnings
     await this.walletsService.processRestaurantEarnings(
       order.restaurantId.toString(),
       id,
-      order.subTotal
+      order.subTotal,
+      order.tax || 0,
+      order.cgst || 0,
+      order.sgst || 0
     );
 
     // Notify Customer about Delivery
@@ -471,11 +487,25 @@ export class OrdersService {
     };
   }
 
-  async getAllOrders(page: number = 1, limit: number = 20): Promise<any> {
+  async getAllOrders(page: number = 1, limit: number = 20, status?: string): Promise<any> {
     const skip = (page - 1) * limit;
+    let query: any = {};
+    
+    if (status === 'active') {
+      query = { 
+        status: { 
+          $nin: [
+            OrderStatus.DELIVERED, 'delivered', 'Delivered',
+            OrderStatus.CANCELLED, 'cancelled', 'Cancelled', 'cancel', 'Cancel'
+          ] 
+        } 
+      };
+    } else if (status) {
+      query = { status };
+    }
 
     const [data, totalItems] = await Promise.all([
-      this.orderModel.find()
+      this.orderModel.find(query)
         .populate('restaurantId', 'name logo address')
         .populate('userId', 'name phone email')
         .populate('driverId')

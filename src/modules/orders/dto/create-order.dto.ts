@@ -1,4 +1,4 @@
-import { IsMongoId, IsNotEmpty, IsString, ValidateNested } from 'class-validator';
+import { IsMongoId, IsNotEmpty, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class AddressDto {
@@ -11,13 +11,15 @@ class AddressDto {
   city: string;
 
   @IsString()
-  @IsNotEmpty()
-  state: string;
+  @IsOptional()
+  state?: string;
 
   @IsString()
-  @IsNotEmpty()
-  postalCode: string;
+  @IsOptional()
+  postalCode?: string;
 
+  @IsOptional()
+  @IsObject()
   geo?: { lat: number; lng: number };
 }
 

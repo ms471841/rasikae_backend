@@ -4,12 +4,14 @@ import { Model, Types } from 'mongoose';
 import { Wallet, WalletDocument } from './schemas/wallet.schema';
 import { Transaction, TransactionDocument, TransactionType } from './schemas/transaction.schema';
 import { WithdrawDto } from './dto/withdraw.dto';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class WalletsService {
   constructor(
     @InjectModel(Wallet.name) private walletModel: Model<WalletDocument>,
     @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async initializeWallet(userId: string): Promise<WalletDocument> {
@@ -48,6 +50,16 @@ export class WalletsService {
     const wallet = await this.walletModel.findOne({ restaurantId: new Types.ObjectId(restaurantId) }).exec();
     if (!wallet) return this.initializeRestaurantWallet(restaurantId);
     return wallet;
+  }
+  
+  async getPlatformWallet(): Promise<WalletDocument> {
+    const wallet = await this.walletModel.findOne({ walletType: 'PLATFORM' }).exec();
+    if (wallet) return wallet;
+    
+    const newWallet = new this.walletModel({
+      walletType: 'PLATFORM',
+    });
+    return newWallet.save();
   }
 
   async getTransactionsByRestaurant(restaurantId: string): Promise<Transaction[]> {
@@ -88,17 +100,27 @@ export class WalletsService {
     await wallet.save();
   }
 
-  async processRestaurantEarnings(restaurantId: string, orderId: string, subTotal: number): Promise<void> {
+  async processRestaurantEarnings(restaurantId: string, orderId: string, subTotal: number, tax: number = 0, cgst: number = 0, sgst: number = 0): Promise<void> {
     const wallet = await this.getWalletByRestaurant(restaurantId);
+    const settings = await this.settingsService.getSettings();
 
-    // Platform Commission logic (Static 10%)
-    const platformCommission = Math.round(subTotal * 0.10);
+    // Platform Commission logic (Dynamic from Settings)
+    const commissionRate = settings.platformCommissionPercentage || 0.10;
+    const platformCommission = Math.round(subTotal * commissionRate);
     const finalRestaurantEarning = subTotal - platformCommission;
 
     wallet.availableBalance += finalRestaurantEarning;
     wallet.totalEarned += finalRestaurantEarning;
 
-    // Log the earning
+    // Platform Balance Injection (Commission + Taxes)
+    const platformWallet = await this.getPlatformWallet();
+    const totalPlatformInjection = platformCommission + tax; // We assume the platform holds the tax for filing
+    
+    platformWallet.availableBalance += totalPlatformInjection;
+    platformWallet.totalEarned += totalPlatformInjection;
+    await platformWallet.save();
+
+    // Log the restaurant earning
     const earningTxData = {
       walletId: wallet._id as Types.ObjectId,
       orderId: new Types.ObjectId(orderId),
@@ -108,15 +130,27 @@ export class WalletsService {
     };
     await new this.transactionModel(earningTxData).save();
 
-    // Log the commission mathematically
+    // Log the platform revenue (Commission)
     const commissionTxData = {
-      walletId: wallet._id as Types.ObjectId,
+      walletId: platformWallet._id as Types.ObjectId,
       orderId: new Types.ObjectId(orderId),
       amount: platformCommission,
       type: TransactionType.PLATFORM_COMMISSION,
-      description: `10% Platform Commission deducted for Order ${orderId}`,
+      description: `${(commissionRate * 100).toFixed(1)}% Platform Commission from Order ${orderId}`,
     };
     await new this.transactionModel(commissionTxData).save();
+
+    // Log the platform tax collection
+    if (tax > 0) {
+      const taxTxData = {
+        walletId: platformWallet._id as Types.ObjectId,
+        orderId: new Types.ObjectId(orderId),
+        amount: tax,
+        type: TransactionType.TAX_COLLECTED,
+        description: `Tax Collected (CGST: ${cgst/100}, SGST: ${sgst/100}) for Order ${orderId}`,
+      };
+      await new this.transactionModel(taxTxData).save();
+    }
 
     await wallet.save();
   }

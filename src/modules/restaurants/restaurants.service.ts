@@ -31,12 +31,17 @@ export class RestaurantsService {
     limit: number = 10,
     lat?: number,
     lng?: number,
-    filters: { minRating?: number; maxDistance?: number; isVeg?: boolean; cuisines?: string[]; categoryId?: string } = {}
+    filters: { search?: string; status?: string; isPublished?: boolean; minRating?: number; maxDistance?: number; isVeg?: boolean; cuisines?: string[]; categoryId?: string } = {}
   ): Promise<any> {
     const skip = (page - 1) * limit;
-    const baseMatch: any = { status: 'approved', isPublished: true };
+    const baseMatch: any = {};
 
     // Apply dynamic filters
+    if (filters.search) {
+      baseMatch.name = { $regex: filters.search, $options: 'i' };
+    }
+    if (filters.status) baseMatch.status = filters.status;
+    if (filters.isPublished !== undefined) baseMatch.isPublished = filters.isPublished;
     if (filters.minRating) baseMatch.rating = { $gte: filters.minRating };
     if (filters.isVeg === true) baseMatch.isVeg = true;
     if (filters.cuisines && filters.cuisines.length > 0) {

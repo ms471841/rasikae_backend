@@ -60,16 +60,30 @@ export class UsersController {
     return this.usersService.deleteAccount(uid);
   }
 
+  @Get('admin/search')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async searchUsers(
+    @Query('q') query: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedLimit = limit ? parseInt(limit, 10) : 10;
+    return this.usersService.searchUsers(query, parsedPage, parsedLimit);
+  }
+
   @Get('admin/all')
   @UseGuards(RolesGuard)
   @Roles('admin')
   async findAllAdmin(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('search') search?: string,
   ) {
     const parsedPage = page ? parseInt(page, 10) : 1;
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    return this.usersService.findAllAdmin(parsedPage, parsedLimit);
+    return this.usersService.findAllAdmin(parsedPage, parsedLimit, search);
   }
 
   @Patch('admin/:id/status')
@@ -87,5 +101,12 @@ export class UsersController {
   @Roles('admin')
   async syncStats() {
     return this.usersService.syncAllUserStats();
+  }
+
+  @Patch('admin/:id/toggle-active')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async toggleActive(@Param('id') id: string) {
+    return this.usersService.toggleUserActive(id);
   }
 }

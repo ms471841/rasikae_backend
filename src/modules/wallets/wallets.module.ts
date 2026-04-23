@@ -4,6 +4,7 @@ import { WalletsService } from './wallets.service';
 import { WalletsController } from './wallets.controller';
 import { Wallet, WalletSchema } from './schemas/wallet.schema';
 import { Transaction, TransactionSchema } from './schemas/transaction.schema';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { Transaction, TransactionSchema } from './schemas/transaction.schema';
       { name: Wallet.name, schema: WalletSchema },
       { name: Transaction.name, schema: TransactionSchema },
     ]),
+    SettingsModule,
   ],
   controllers: [WalletsController],
   providers: [WalletsService],

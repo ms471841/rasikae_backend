@@ -14,8 +14,23 @@ export class MenuItemsController {
   }
 
   @Get()
-  findAll() {
-    return this.menuItemsService.findAll();
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('restaurantId') restaurantId?: string,
+    @Query('isVeg') isVeg?: string,
+    @Query('isAvailable') isAvailable?: string,
+  ) {
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    const filters = {
+      search,
+      restaurantId,
+      isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
+      isAvailable: isAvailable === 'true' ? true : isAvailable === 'false' ? false : undefined,
+    };
+    return this.menuItemsService.findAll(parsedPage, parsedLimit, filters);
   }
 
   @Get('restaurant/:id')

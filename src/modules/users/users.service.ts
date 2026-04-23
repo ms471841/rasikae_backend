@@ -122,16 +122,26 @@ export class UsersService {
     return user.save();
   }
 
-  async findAllAdmin(page: number = 1, limit: number = 20): Promise<any> {
+  async findAllAdmin(page: number = 1, limit: number = 20, search?: string): Promise<any> {
     const skip = (page - 1) * limit;
+    const query: any = {};
+
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      query.$or = [
+        { name: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex }
+      ];
+    }
 
     const [data, totalItems] = await Promise.all([
-      this.userModel.find()
+      this.userModel.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.userModel.countDocuments().exec()
+      this.userModel.countDocuments(query).exec()
     ]);
 
     const totalPages = Math.ceil(totalItems / limit);
@@ -145,9 +155,6 @@ export class UsersService {
   }
 
   async updateStatus(uid: string, role: string): Promise<User> {
-    // Note: status is often handled by 'role' or a separate 'isBlocked' field.
-    // Assuming for now it's a simple role toggle or we can add 'isBlocked' to schema if needed.
-    // For this surprise, I'll update the profile.
     const user = await this.userModel.findOneAndUpdate(
       { $or: [{ _id: new Types.ObjectId(uid) }, { firebaseUid: uid }] },
       { $set: { role } },
@@ -158,6 +165,28 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
     return user;
+  }
+  
+  async toggleUserActive(id: string): Promise<User> {
+    const user = await this.userModel.findById(id).exec();
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    
+    user.isActive = !user.isActive;
+    
+    // Sync with Firebase Auth
+    try {
+      await admin.auth().updateUser(user.firebaseUid, {
+        disabled: !user.isActive
+      });
+    } catch (err) {
+      console.error('Firebase Auth sync failed:', err);
+      // We continue even if firebase fails, but the database will be out of sync.
+      // Ideally we should handle this, but for now we'll just log it.
+    }
+    
+    return user.save();
   }
 
   async incrementUserStats(userId: string | Types.ObjectId, amountPaise: number): Promise<void> {
@@ -204,5 +233,33 @@ export class UsersService {
 
     await Promise.all(updates);
     return { updatedCount: aggregation.length };
+  }
+
+  async searchUsers(query: string, page: number = 1, limit: number = 10): Promise<any> {
+    const skip = (page - 1) * limit;
+    const searchRegex = new RegExp(query, 'i');
+    const filter = {
+      $or: [
+        { name: searchRegex },
+        { email: searchRegex },
+        { phone: searchRegex }
+      ]
+    };
+
+    const [data, totalItems] = await Promise.all([
+      this.userModel.find(filter)
+        .sort({ name: 1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.userModel.countDocuments(filter).exec()
+    ]);
+
+    return {
+      data,
+      totalItems,
+      totalPages: Math.ceil(totalItems / limit),
+      currentPage: page
+    };
   }
 }

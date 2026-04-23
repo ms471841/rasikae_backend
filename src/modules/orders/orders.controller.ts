@@ -36,10 +36,16 @@ export class OrdersController {
   async findAllOrders(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('status') status?: string,
   ) {
     const parsedPage = Math.max(1, page ? parseInt(page, 10) : 1);
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    return this.ordersService.getAllOrders(parsedPage, parsedLimit);
+    return this.ordersService.getAllOrders(parsedPage, parsedLimit, status);
+  }
+
+  @Get('restaurant/:restaurantId')
+  findRestaurantOrders(@Param('restaurantId') restaurantId: string) {
+    return this.ordersService.getRestaurantOrders(restaurantId);
   }
 
   @Get('vendor/all')
@@ -62,11 +68,6 @@ export class OrdersController {
     return this.ordersService.getDriverOrders(driver._id.toString());
   }
 
-  @Get('restaurant/:restaurantId')
-  findRestaurantOrders(@Param('restaurantId') restaurantId: string) {
-    return this.ordersService.getRestaurantOrders(restaurantId);
-  }
-
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ordersService.getOrderById(id);
@@ -85,6 +86,11 @@ export class OrdersController {
   @Patch(':id/delivered')
   async markDelivered(@Param('id') id: string, @CurrUser() user: any) {
     const mongoUser = await this.usersService.getProfile(user.uid || user.firebaseUid);
+    
+    if (mongoUser.role === 'admin') {
+      return this.ordersService.markDelivered(id);
+    }
+
     const driver = await this.driversService.findByUserId(mongoUser._id.toString());
     return this.ordersService.markDelivered(id, driver._id.toString());
   }

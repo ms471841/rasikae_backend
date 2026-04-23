@@ -11,6 +11,7 @@ export enum TransactionType {
   RESTAURANT_EARNING = 'RESTAURANT_EARNING',
   PLATFORM_COMMISSION = 'PLATFORM_COMMISSION',
   WALLET_TOPUP = 'WALLET_TOPUP',
+  TAX_COLLECTED = 'TAX_COLLECTED',
 }
 
 @Schema({ timestamps: true })
@@ -29,6 +30,9 @@ export class Transaction {
 
   @Prop({ required: true })
   description: string;
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const TransactionSchema = SchemaFactory.createForClass(Transaction);
