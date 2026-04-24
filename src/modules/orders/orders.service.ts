@@ -390,7 +390,9 @@ export class OrdersService {
       throw new BadRequestException('You are not authorized to mark this order as delivered. Is it assigned to you?');
     }
 
-    if (order.status !== OrderStatus.OUT_FOR_DELIVERY && order.status !== OrderStatus.PREPARING) {
+    if (order.status !== OrderStatus.OUT_FOR_DELIVERY && 
+        order.status !== OrderStatus.PREPARING && 
+        order.status !== OrderStatus.READY) {
       throw new BadRequestException(`Cannot deliver an order in ${order.status} status.`);
     }
 

@@ -125,7 +125,18 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
         
         // Update the throttling map
         this.lastUpdateMap.set(firebaseUid, { time: now, lat: data.lat, lng: data.lng });
-        console.log(`Saved location for driver ${firebaseUid} to DB (Hybrid Sync)`);
+        
+        // 3. Broadcast to Admin OCC (Global Visibility)
+        this.server.to(`admin`).emit('driverLocationUpdated', {
+          driverId: driver._id.toString(),
+          uid: firebaseUid,
+          lat: data.lat,
+          lng: data.lng,
+          orderId: data.orderId,
+          timestamp: new Date().toISOString(),
+        });
+
+        console.log(`Saved location for driver ${firebaseUid} to DB and broadcast to Admin`);
       } catch (error) {
         console.error(`Failed to update driver location in DB: ${error.message}`);
       }

@@ -140,16 +140,35 @@ export class WalletsService {
     };
     await new this.transactionModel(commissionTxData).save();
 
-    // Log the platform tax collection
-    if (tax > 0) {
-      const taxTxData = {
+    // Log the platform tax collection (Split into CGST & SGST)
+    if (cgst > 0) {
+      await new this.transactionModel({
+        walletId: platformWallet._id as Types.ObjectId,
+        orderId: new Types.ObjectId(orderId),
+        amount: cgst,
+        type: TransactionType.CGST_COLLECTED,
+        description: `CGST (2.5%) Collected for Order ${orderId}`,
+      }).save();
+    }
+    if (sgst > 0) {
+      await new this.transactionModel({
+        walletId: platformWallet._id as Types.ObjectId,
+        orderId: new Types.ObjectId(orderId),
+        amount: sgst,
+        type: TransactionType.SGST_COLLECTED,
+        description: `SGST (2.5%) Collected for Order ${orderId}`,
+      }).save();
+    }
+    
+    // Legacy support: also log total tax if cgst/sgst are not provided but tax is
+    if (tax > 0 && cgst === 0 && sgst === 0) {
+      await new this.transactionModel({
         walletId: platformWallet._id as Types.ObjectId,
         orderId: new Types.ObjectId(orderId),
         amount: tax,
         type: TransactionType.TAX_COLLECTED,
-        description: `Tax Collected (CGST: ${cgst/100}, SGST: ${sgst/100}) for Order ${orderId}`,
-      };
-      await new this.transactionModel(taxTxData).save();
+        description: `Tax Collected (Total) for Order ${orderId}`,
+      }).save();
     }
 
     await wallet.save();
@@ -214,7 +233,7 @@ export class WalletsService {
     }
 
     if (wallet.availableBalance <= 0) {
-      throw new BadRequestException('Wallet has no balance to settle');
+      return wallet;
     }
 
     const amountToSettle = wallet.availableBalance;
