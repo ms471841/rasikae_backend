@@ -39,11 +39,13 @@ export class MenuItemsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('isVeg') isVeg?: string,
+    @Query('isAvailable') isAvailable?: string,
   ) {
     const parsedPage = page ? parseInt(page, 10) : 1;
     const parsedLimit = limit ? parseInt(limit, 10) : 10;
     const filters = {
       isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
+      isAvailable: isAvailable === 'true' ? true : isAvailable === 'false' ? false : undefined,
     };
     return this.menuItemsService.findByRestaurant(id, parsedPage, parsedLimit, filters);
   }

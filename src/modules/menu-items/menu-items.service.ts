@@ -82,10 +82,14 @@ export class MenuItemsService {
     id: string,
     page: number = 1,
     limit: number = 10,
-    filters: { isVeg?: boolean } = {}
+    filters: { isVeg?: boolean; isAvailable?: boolean } = {}
   ): Promise<any> {
     const skip = (page - 1) * limit;
-    const query: any = { restaurantId: id, isAvailable: true };
+    const query: any = { restaurantId: id };
+
+    if (filters.isAvailable !== undefined) {
+      query.isAvailable = filters.isAvailable;
+    }
 
     if (filters.isVeg !== undefined) {
       query.isVeg = filters.isVeg;
