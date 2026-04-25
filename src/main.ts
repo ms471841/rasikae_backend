@@ -9,7 +9,10 @@ async function bootstrap() {
       origin: [
         'http://localhost:5173', // Admin Panel
         'http://localhost:3000', // Backend itself
+        'https://rasikae.com',
+        'https://rasikaebackend-production.up.railway.app/',
         /\.rasikae\.com$/,       // Any subdomain of rasikae.com
+
       ],
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
       allowedHeaders: 'Content-Type,Accept,Authorization',
