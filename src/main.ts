@@ -4,16 +4,19 @@ import { AppModule } from './app.module';
 import helmet from 'helmet';
 
 async function bootstrap() {
+
+  //enable cors for all domains
   const app = await NestFactory.create(AppModule, {
     cors: {
-      origin: [
-        'http://localhost:5173', // Admin Panel
-        'http://localhost:3000', // Backend itself
-        'https://rasikae.com',
-        'https://rasikaebackend-production.up.railway.app/',
-        /\.rasikae\.com$/,       // Any subdomain of rasikae.com
+      origin: '*',
+      // origin: [
+      //   'http://localhost:5173', // Admin Panel
+      //   'http://localhost:3000', // Backend itself
+      //   'https://rasikae.com',
+      //   'https://rasikaebackend-production.up.railway.app/',
+      //   /\.rasikae\.com$/,       // Any subdomain of rasikae.com
 
-      ],
+      // ],
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
       allowedHeaders: 'Content-Type,Accept,Authorization',
       credentials: true,
