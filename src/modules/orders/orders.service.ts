@@ -542,11 +542,15 @@ export class OrdersService {
       query = { status };
     }
 
+    
     const [data, totalItems] = await Promise.all([
       this.orderModel.find(query)
         .populate('restaurantId', 'name logo address')
         .populate('userId', 'name phone email')
-        .populate('driverId')
+        .populate({
+        path: 'driverId',
+        populate: { path: 'userId', select: 'name phoneNumber' }
+      })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -555,7 +559,7 @@ export class OrdersService {
     ]);
 
     const totalPages = Math.ceil(totalItems / limit);
-
+  
     return {
       data,
       totalItems,
