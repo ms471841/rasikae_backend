@@ -315,7 +315,15 @@ export class OrdersService {
       id,
       { status: updateOrderStatusDto.status },
       { returnDocument: 'after' }
-    ).exec();
+    )
+      .populate('restaurantId', 'name logo address')
+      .populate('userId', 'name phone email')
+      .populate({
+        path: 'driverId',
+        populate: { path: 'userId', select: 'name phoneNumber' }
+      })
+      .exec();
+
 
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
@@ -497,11 +505,23 @@ export class OrdersService {
     // Driver array sorted by $nearSphere, so 0 is nearest
     const matchedDriver = nearbyDrivers[0] as any; 
 
-    order.driverId = matchedDriver._id as any; 
+    order.driverId = matchedDriver._id as any;
     order.status = OrderStatus.PREPARING;
+    
     await order.save();
+    
+    // Populate for the response
+    await order.populate([
+      { path: 'restaurantId', select: 'name logo address' },
+      { path: 'userId', select: 'name phone email' },
+      { 
+        path: 'driverId', 
+        populate: { path: 'userId', select: 'name phoneNumber' } 
+      }
+    ]);
 
     const matchedDriverId = matchedDriver._id.toString();
+
 
     // Notify Customer
     await this.notificationsService.sendToUser(order.userId.toString(), {
@@ -555,7 +575,8 @@ export class OrdersService {
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.orderModel.countDocuments().exec()
+      this.orderModel.countDocuments(query).exec()
+
     ]);
 
     const totalPages = Math.ceil(totalItems / limit);
