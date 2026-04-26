@@ -101,15 +101,15 @@ export class DriversService {
   }
 
   async findAll(): Promise<Driver[]> {
-    return this.driverModel.find().populate('userId', 'firstName lastName email phoneNumber').exec();
+    return this.driverModel.find().populate('userId', 'name email phone').exec();
   }
 
   async findAvailable(): Promise<Driver[]> {
-    return this.driverModel.find({ isAvailable: true }).populate('userId', 'firstName lastName phoneNumber').exec();
+    return this.driverModel.find({ isAvailable: true }).populate('userId', 'name phone').exec();
   }
 
   async getFleet(): Promise<Driver[]> {
-    return this.driverModel.find({ currentLocation: { $exists: true } }).populate('userId', 'name firstName lastName phoneNumber').exec();
+    return this.driverModel.find({ currentLocation: { $exists: true } }).populate('userId', 'name phone').exec();
   }
 
   async findNearbyAvailable(lng: number, lat: number, maxDistance: number): Promise<Driver[]> {
@@ -124,11 +124,11 @@ export class DriversService {
           $maxDistance: maxDistance
         }
       }
-    }).populate('userId', 'name phoneNumber').exec();
+    }).populate('userId', 'name phone').exec();
   }
 
   async findOne(id: string): Promise<Driver> {
-    const driver = await this.driverModel.findById(id).populate('userId', 'firstName lastName email phoneNumber').exec();
+    const driver = await this.driverModel.findById(id).populate('userId', 'name email phone').exec();
     if (!driver) {
       throw new NotFoundException(`Driver with ID ${id} not found`);
     }

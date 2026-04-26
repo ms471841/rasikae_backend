@@ -90,7 +90,8 @@ export class Order {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true })
   restaurantId: mongoose.Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Driver', required: false })
+
   driverId?: mongoose.Types.ObjectId;
 
   @Prop({ type: [OrderItemSchema], required: true })

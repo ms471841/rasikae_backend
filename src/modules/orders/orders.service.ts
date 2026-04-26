@@ -274,7 +274,7 @@ export class OrdersService {
         .populate('userId', 'name phone email')
         .populate({
           path: 'driverId',
-          populate: { path: 'userId', select: 'name phoneNumber' }
+          populate: { path: 'userId', select: 'name phone' }
         })
         .sort({ createdAt: -1 })
 
@@ -300,7 +300,7 @@ export class OrdersService {
       .populate('userId', 'name phone email')
       .populate({
         path: 'driverId',
-        populate: { path: 'userId', select: 'name phoneNumber' }
+        populate: { path: 'userId', select: 'name phone' }
       })
       .exec();
 
@@ -320,7 +320,7 @@ export class OrdersService {
       .populate('userId', 'name phone email')
       .populate({
         path: 'driverId',
-        populate: { path: 'userId', select: 'name phoneNumber' }
+        populate: { path: 'userId', select: 'name phone' }
       })
       .exec();
 
@@ -387,7 +387,7 @@ export class OrdersService {
       .populate('userId', 'name phone email')
       .populate({
         path: 'driverId',
-        populate: { path: 'userId', select: 'name phoneNumber' }
+        populate: { path: 'userId', select: 'name phone' }
       })
       .exec();
 
@@ -516,7 +516,7 @@ export class OrdersService {
       { path: 'userId', select: 'name phone email' },
       { 
         path: 'driverId', 
-        populate: { path: 'userId', select: 'name phoneNumber' } 
+        populate: { path: 'userId', select: 'name phone' } 
       }
     ]);
 
@@ -569,7 +569,7 @@ export class OrdersService {
         .populate('userId', 'name phone email')
         .populate({
         path: 'driverId',
-        populate: { path: 'userId', select: 'name phoneNumber' }
+        populate: { path: 'userId', select: 'name phone' }
       })
         .sort({ createdAt: -1 })
         .skip(skip)
