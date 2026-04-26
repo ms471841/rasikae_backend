@@ -272,7 +272,12 @@ export class OrdersService {
       this.orderModel.find(baseMatch)
         .populate('restaurantId', 'name logo address')
         .populate('userId', 'name phone email')
+        .populate({
+          path: 'driverId',
+          populate: { path: 'userId', select: 'name phoneNumber' }
+        })
         .sort({ createdAt: -1 })
+
         .skip(skip)
         .limit(limit)
         .exec(),
@@ -293,7 +298,12 @@ export class OrdersService {
     const order = await this.orderModel.findById(id)
       .populate('restaurantId', 'name logo coverImages rating address location')
       .populate('userId', 'name phone email')
+      .populate({
+        path: 'driverId',
+        populate: { path: 'userId', select: 'name phoneNumber' }
+      })
       .exec();
+
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
@@ -359,12 +369,20 @@ export class OrdersService {
     // Update order with driverId and bump status
     const order = await this.orderModel.findByIdAndUpdate(
       id,
-      { 
+      {
         driverId: new Types.ObjectId(driverId),
         status: OrderStatus.PREPARING // Auto progression
       },
       { new: true }
-    ).exec();
+    )
+      .populate('restaurantId', 'name logo address')
+      .populate('userId', 'name phone email')
+      .populate({
+        path: 'driverId',
+        populate: { path: 'userId', select: 'name phoneNumber' }
+      })
+      .exec();
+
 
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
