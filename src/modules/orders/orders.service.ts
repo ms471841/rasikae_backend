@@ -323,6 +323,20 @@ export class OrdersService {
       }
     }
 
+    // 3. Emit to driver room (to sync driver list view)
+    if (order.driverId) {
+      try {
+        const driver = await this.driversService.findOne(order.driverId.toString());
+        const driverUser = driver.userId as any;
+        if (driverUser && driverUser.firebaseUid) {
+          this.socketsGateway.emitOrderStatusToDriver(driverUser.firebaseUid, id, updateOrderStatusDto.status);
+        }
+      } catch (e) {
+        // Silently fail if driver not found or user not populated
+      }
+    }
+
+
     // 3. Notify Customer about Status Change (Push Notification)
     await this.notificationsService.sendToUser(order.userId.toString(), {
       title: 'Order Update 🍕',
@@ -433,7 +447,11 @@ export class OrdersService {
     // Update User Stats (Denormalization)
     await this.usersService.incrementUserStats(order.userId, order.totalAmount);
 
+    // Live Socket Sync
+    this.socketsGateway.emitOrderStatus(id, OrderStatus.DELIVERED);
+
     return order;
+
   }
 
   async autoAssignDriver(id: string, maxDistance: number = 10000): Promise<{ order: Order, driverId?: string, message: string }> {

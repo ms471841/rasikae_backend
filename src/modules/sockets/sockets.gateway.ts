@@ -176,6 +176,15 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     });
   }
 
+  emitOrderStatusToDriver(driverUid: string, orderId: string, status: string) {
+    this.server.to(`driver_${driverUid}`).emit('orderStatusUpdated', {
+      orderId,
+      status,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+
   emitNewOrder(vendorId: string, order: any) {
     const payload = {
       order,
