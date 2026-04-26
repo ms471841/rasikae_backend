@@ -124,7 +124,7 @@ export class DriversService {
           $maxDistance: maxDistance
         }
       }
-    }).populate('userId', 'firstName lastName phoneNumber').exec();
+    }).populate('userId', 'name phoneNumber').exec();
   }
 
   async findOne(id: string): Promise<Driver> {
