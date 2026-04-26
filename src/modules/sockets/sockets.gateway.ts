@@ -88,7 +88,7 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @ConnectedSocket() client: Socket,
   ) {
     client.join(`admin`);
-    console.log(`Admin ${client.id} joined global operations stream.`);
+    console.log(`[Socket] Admin ${client.id} joined 'admin' room. Total in room:`, this.server.sockets.adapter.rooms.get('admin')?.size);
     return { event: 'joinedRoom', data: `Joined admin stream` };
   }
 
@@ -186,13 +186,25 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
 
   emitNewOrder(vendorId: string, order: any) {
+    // Ensure the order is serialized to a plain object with string IDs
+    const serializedOrder = JSON.parse(JSON.stringify(order));
+    
     const payload = {
-      order,
+      order: serializedOrder,
       timestamp: new Date().toISOString(),
     };
+
+    // Emit to vendor
     this.server.to(`vendor_${vendorId}`).emit('newOrder', payload);
-    this.server.to(`admin`).emit('newAdminOrder', payload);
+    
+    // Emit to admin
+    const adminRoom = this.server.sockets.adapter.rooms.get('admin');
+    console.log(`[Socket] Broadcasting newAdminOrder for ${serializedOrder._id}. Admin room size: ${adminRoom?.size || 0}`);
+    
+    // Using this.server.to('admin') is correct, but let's be sure
+    this.server.to('admin').emit('newAdminOrder', payload);
   }
+
 
   emitNewOrderToDriver(driverIdOrUid: string, order: any) {
     this.server.to(`driver_${driverIdOrUid}`).emit('newAssignment', {

@@ -37,6 +37,15 @@ export class OrdersService {
     private readonly usersService: UsersService,
   ) {}
 
+  private extractId(id: any): string {
+    if (!id) return '';
+    if (typeof id === 'string') return id;
+    if (id instanceof Types.ObjectId) return id.toHexString();
+    if (id._id) return id._id.toString();
+    return id.toString();
+  }
+
+
   async checkout(userId: string, checkoutDto: CheckoutDto): Promise<{ orders: OrderDocument[], paymentData?: any }> {
     const { deliveryAddress, paymentMethod, idempotencyKey } = checkoutDto;
 
@@ -315,19 +324,24 @@ export class OrdersService {
       id,
       { status: updateOrderStatusDto.status },
       { returnDocument: 'after' }
-    )
-      .populate('restaurantId', 'name logo address')
-      .populate('userId', 'name phone email')
-      .populate({
-        path: 'driverId',
-        populate: { path: 'userId', select: 'name phone' }
-      })
-      .exec();
-
+    ).exec();
 
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
+
+    const userIdStr = this.extractId(order.userId);
+
+
+    await order.populate([
+      { path: 'restaurantId', select: 'name logo address' },
+      { path: 'userId', select: 'name phone email' },
+      {
+        path: 'driverId',
+        populate: { path: 'userId', select: 'name phone' }
+      }
+    ]);
+
     
     // 1. Emit to dynamic order room (for active detail screens)
     this.socketsGateway.emitOrderStatus(id, updateOrderStatusDto.status);
@@ -356,7 +370,8 @@ export class OrdersService {
 
 
     // 3. Notify Customer about Status Change (Push Notification)
-    await this.notificationsService.sendToUser(order.userId.toString(), {
+    await this.notificationsService.sendToUser(userIdStr, {
+
       title: 'Order Update 🍕',
       body: `Your order status is now: ${updateOrderStatusDto.status}`,
       data: { orderId: id, status: updateOrderStatusDto.status }
@@ -379,32 +394,40 @@ export class OrdersService {
       id,
       {
         driverId: new Types.ObjectId(driverId),
-        status: OrderStatus.PREPARING // Auto progression
+       
       },
       { new: true }
-    )
-      .populate('restaurantId', 'name logo address')
-      .populate('userId', 'name phone email')
-      .populate({
-        path: 'driverId',
-        populate: { path: 'userId', select: 'name phone' }
-      })
-      .exec();
-
+    ).exec();
 
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
 
+    const userIdStr = this.extractId(order.userId);
+
+
+    await order.populate([
+      { path: 'restaurantId', select: 'name logo address' },
+      { path: 'userId', select: 'name phone email' },
+      {
+        path: 'driverId',
+        populate: { path: 'userId', select: 'name phone' }
+      }
+    ]);
+
+
     // Notify Customer
-    await this.notificationsService.sendToUser(order.userId.toString(), {
+    await this.notificationsService.sendToUser(userIdStr, {
+
       title: 'Driver Assigned! 🛵',
       body: 'A driver has been assigned to your order and is on the way.',
       data: { orderId: id, status: 'DRIVER_ASSIGNED' }
     });
 
     // Notify Driver (Corrected to use userId from populated driver)
-    const driverUserId = (driver.userId as any)._id?.toString() || driver.userId.toString();
+    const driverUserId = this.extractId(driver.userId);
+
+
     await this.notificationsService.sendToUser(driverUserId, {
       title: 'New Delivery Assigned! 📦',
       body: `You have a new delivery at ${order.deliveryAddress.street}, ${order.deliveryAddress.city}`,
@@ -464,14 +487,16 @@ export class OrdersService {
     );
 
     // Notify Customer about Delivery
-    await this.notificationsService.sendToUser(order.userId.toString(), {
+    await this.notificationsService.sendToUser(this.extractId(order.userId), {
+
       title: 'Order Delivered! 🍕',
       body: 'Your Rasikae treat has been delivered. Enjoy your meal!',
       data: { orderId: id, status: 'DELIVERED' }
     });
 
     // Update User Stats (Denormalization)
-    await this.usersService.incrementUserStats(order.userId, order.totalAmount);
+    await this.usersService.incrementUserStats(this.extractId(order.userId), order.totalAmount);
+
 
     // Live Socket Sync
     this.socketsGateway.emitOrderStatus(id, OrderStatus.DELIVERED);
@@ -510,6 +535,9 @@ export class OrdersService {
     
     await order.save();
     
+    const userIdStr = this.extractId(order.userId);
+
+
     // Populate for the response
     await order.populate([
       { path: 'restaurantId', select: 'name logo address' },
@@ -520,18 +548,21 @@ export class OrdersService {
       }
     ]);
 
+
     const matchedDriverId = matchedDriver._id.toString();
 
 
     // Notify Customer
-    await this.notificationsService.sendToUser(order.userId.toString(), {
+    await this.notificationsService.sendToUser(userIdStr, {
+
       title: 'Driver Matched! 🛵',
       body: 'We found a driver for your order!',
       data: { orderId: id, status: 'DRIVER_ASSIGNED' }
     });
 
     // Notify Driver
-    const driverUserId = (matchedDriver.userId as any)._id?.toString() || matchedDriver.userId.toString();
+    const driverUserId = this.extractId(matchedDriver.userId);
+
     await this.notificationsService.sendToUser(driverUserId, {
       title: 'Auto-Assigned New Delivery! 📦',
       body: `Nearby delivery assigned at ${order.deliveryAddress.street}`,

@@ -58,7 +58,7 @@ export class UsersService {
     return user;
   }
 
-  async updateFcmToken(firebaseUid: string, dto: UpdateFcmTokenDto): Promise<User> {
+  async updateFcmToken(uid: string, dto: UpdateFcmTokenDto): Promise<User> {
     const { token, action } = dto;
     
     let updateQuery;
@@ -68,8 +68,12 @@ export class UsersService {
       updateQuery = { $pull: { fcmTokens: token } };
     }
 
+    const filter = Types.ObjectId.isValid(uid) 
+      ? { $or: [{ _id: new Types.ObjectId(uid) }, { firebaseUid: uid }] }
+      : { firebaseUid: uid };
+
     const user = await this.userModel.findOneAndUpdate(
-      { firebaseUid },
+      filter,
       updateQuery,
       { returnDocument: 'after' },
     ).exec();
@@ -79,6 +83,7 @@ export class UsersService {
     }
     return user;
   }
+
 
   async getTokens(userIds: string[]): Promise<string[]> {
     const users = await this.userModel.find({ 
