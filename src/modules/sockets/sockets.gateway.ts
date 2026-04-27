@@ -158,15 +158,17 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     return R * c;
   }
 
-  emitOrderStatus(orderId: string, status: string) {
+  emitOrderStatus(orderId: string, status: string, order?: any) {
     const payload = {
       orderId,
       status,
+      order: order ? JSON.parse(JSON.stringify(order)) : null,
       timestamp: new Date().toISOString(),
     };
     this.server.to(`order_${orderId}`).emit('orderStatusUpdated', payload);
     this.server.to(`admin`).emit('orderStatusUpdated', payload);
   }
+
 
   emitOrderStatusToVendor(vendorId: string, orderId: string, status: string) {
     this.server.to(`vendor_${vendorId}`).emit('orderStatusUpdated', {

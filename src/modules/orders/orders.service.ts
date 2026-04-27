@@ -344,7 +344,7 @@ export class OrdersService {
 
     
     // 1. Emit to dynamic order room (for active detail screens)
-    this.socketsGateway.emitOrderStatus(id, updateOrderStatusDto.status);
+    this.socketsGateway.emitOrderStatus(id, updateOrderStatusDto.status, order);
 
     // 2. Emit to vendor room (to sync list view across devices)
     const restaurant = await this.restaurantModel.findById(order.restaurantId).populate('ownerId').exec();
@@ -435,7 +435,10 @@ export class OrdersService {
     });
     
     // Live Socket sync
+    this.socketsGateway.emitOrderStatus(id, order.status, order); // Inform everyone of the update
+    
     const driverUser = driver.userId as any;
+
     if (driverUser && driverUser.firebaseUid) {
       this.socketsGateway.emitNewOrderToDriver(driverUser.firebaseUid, order);
     }
@@ -499,7 +502,7 @@ export class OrdersService {
 
 
     // Live Socket Sync
-    this.socketsGateway.emitOrderStatus(id, OrderStatus.DELIVERED);
+    this.socketsGateway.emitOrderStatus(id, OrderStatus.DELIVERED, order);
 
     return order;
 
@@ -550,6 +553,10 @@ export class OrdersService {
 
 
     const matchedDriverId = matchedDriver._id.toString();
+
+    // Live Socket sync for Admin and others
+    this.socketsGateway.emitOrderStatus(id, OrderStatus.PREPARING, order);
+
 
 
     // Notify Customer
