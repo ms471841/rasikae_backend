@@ -6,8 +6,6 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('settings')
-@UseGuards(FirebaseAuthGuard, RolesGuard)
-@Roles('admin')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
@@ -17,6 +15,8 @@ export class SettingsController {
   }
 
   @Patch()
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
   @HttpCode(HttpStatus.OK)
   updateSettings(@Body() updateSettingsDto: UpdateSettingsDto) {
     return this.settingsService.updateSettings(updateSettingsDto);

@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
 
@@ -25,6 +26,8 @@ async function bootstrap() {
 
   // Security Headers
   app.use(helmet());
+
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
