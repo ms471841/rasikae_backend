@@ -16,4 +16,8 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   avatarUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  preference?: string;
 }

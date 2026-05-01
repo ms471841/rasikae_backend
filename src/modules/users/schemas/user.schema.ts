@@ -20,6 +20,9 @@ export class User {
   @Prop()
   avatarUrl?: string;
 
+  @Prop()
+  preference?: string;
+
   @Prop({ default: 'customer', enum: ['customer', 'admin', 'vendor', 'driver'] })
   role: string;
 
