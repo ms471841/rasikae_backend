@@ -376,6 +376,13 @@ export class OrdersService {
       body: `Your order status is now: ${updateOrderStatusDto.status}`,
       data: { orderId: id, status: updateOrderStatusDto.status }
     });
+
+    // Auto-assign driver if status is ACCEPTED
+    if (updateOrderStatusDto.status === OrderStatus.ACCEPTED) {
+      this.autoAssignDriver(id).catch(e => {
+        console.error('Auto-assignment failed during status update:', e);
+      });
+    }
     
     return order;
   }
