@@ -109,6 +109,7 @@ export class NotificationsService {
         response.responses.forEach((resp, idx) => {
           if (!resp.success) {
             const errorCode = resp.error?.code;
+            this.logger.error(`Token at index ${idx} failed: ${resp.error?.message} (${errorCode})`);
             if (
               errorCode === 'messaging/registration-token-not-registered' ||
               errorCode === 'messaging/invalid-registration-token'
