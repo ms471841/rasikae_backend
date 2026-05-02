@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Query, Res } from '@nestjs/common';
+import * as express from 'express';
 import { OrdersService } from './orders.service';
 import { CheckoutDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -11,6 +12,8 @@ import { DriversService } from '../drivers/drivers.service';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
+import { InvoicesService } from './invoices.service';
+
 @Controller('orders')
 @UseGuards(FirebaseAuthGuard)
 export class OrdersController {
@@ -18,6 +21,7 @@ export class OrdersController {
     private readonly ordersService: OrdersService,
     private readonly usersService: UsersService,
     private readonly driversService: DriversService,
+    private readonly invoicesService: InvoicesService,
   ) {}
 
   @Post('checkout')
@@ -68,6 +72,20 @@ export class OrdersController {
     return this.ordersService.getDriverOrders(driver._id.toString());
   }
 
+  @Get(':id/invoice')
+  async getInvoice(@Param('id') id: string, @Res() res: express.Response) {
+    const order = await this.ordersService.getOrderById(id);
+    const pdfBuffer = await this.invoicesService.generateInvoicePdf(order);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=invoice_${id.slice(-6)}.pdf`,
+      'Content-Length': pdfBuffer.length,
+    });
+
+    res.end(pdfBuffer);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ordersService.getOrderById(id);
@@ -99,4 +117,6 @@ export class OrdersController {
   autoAssign(@Param('id') id: string) {
     return this.ordersService.autoAssignDriver(id);
   }
+
+
 }

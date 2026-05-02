@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
+import { InvoicesService } from './invoices.service';
 import { Order, OrderSchema } from './schemas/order.schema';
 import { MenuItem, MenuItemSchema } from '../menu-items/schemas/menu-item.schema';
 import { Restaurant, RestaurantSchema } from '../restaurants/schemas/restaurant.schema';
@@ -32,7 +33,7 @@ import { forwardRef } from '@nestjs/common';
     FirebaseModule,
   ],
   controllers: [OrdersController],
-  providers: [OrdersService],
-  exports: [OrdersService],
+  providers: [OrdersService, InvoicesService],
+  exports: [OrdersService, InvoicesService],
 })
 export class OrdersModule {}

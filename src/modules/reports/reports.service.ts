@@ -18,16 +18,30 @@ export class ReportsService {
       createdAt: { $gte: startDate, $lte: endDate }
     }).populate('restaurantId', 'name').populate('userId', 'name email').exec();
 
-    const headers = ['Order ID', 'Date', 'Customer', 'Restaurant', 'Amount', 'Status', 'Payment Method'];
-    const rows = orders.map(o => [
-      o._id.toString(),
-      o.createdAt.toISOString(),
-      (o.userId as any)?.name || 'N/A',
-      (o.restaurantId as any)?.name || 'N/A',
-      o.totalAmount / 100,
-      o.status,
-      o.paymentMethod
-    ]);
+    const headers = [
+      'Order ID', 'Date', 'Customer', 'Restaurant', 
+      'Subtotal', 'CGST (5%)', 'SGST (5%)', 'Delivery Fee', 
+      'Platform Commission', 'Restaurant Earning', 'Total Amount', 
+      'Status', 'Payment Method'
+    ];
+    const rows = orders.map(o => {
+      const orderData = o as any;
+      return [
+        o._id.toString(),
+        o.createdAt.toISOString(),
+        (o.userId as any)?.name || 'N/A',
+        (o.restaurantId as any)?.name || 'N/A',
+        (orderData.subtotal || 0) / 100,
+        (orderData.cgst || 0) / 100,
+        (orderData.sgst || 0) / 100,
+        (orderData.deliveryFee || 0) / 100,
+        (orderData.platformCommission || 0) / 100,
+        (orderData.restaurantEarnings || 0) / 100,
+        o.totalAmount / 100,
+        o.status,
+        o.paymentMethod
+      ];
+    });
 
     return this.toCsv(headers, rows);
   }

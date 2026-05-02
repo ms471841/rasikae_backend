@@ -1,5 +1,5 @@
 import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
-import type { Response } from 'express';
+import * as express from 'express';
 import { ReportsService } from './reports.service';
 import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -15,7 +15,7 @@ export class ReportsController {
   async exportOrders(
     @Query('start') start: string,
     @Query('end') end: string,
-    @Res() res: Response,
+    @Res() res: express.Response,
   ) {
     const startDate = new Date(start || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
     const endDate = new Date(end || new Date().toISOString());
@@ -31,7 +31,7 @@ export class ReportsController {
   async exportTransactions(
     @Query('start') start: string,
     @Query('end') end: string,
-    @Res() res: Response,
+    @Res() res: express.Response,
   ) {
     const startDate = new Date(start || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
     const endDate = new Date(end || new Date().toISOString());
@@ -44,7 +44,7 @@ export class ReportsController {
   }
 
   @Get('users')
-  async exportUsers(@Res() res: Response) {
+  async exportUsers(@Res() res: express.Response) {
     const csv = await this.reportsService.generateUsersCsv();
     
     res.set('Content-Type', 'text/csv');
