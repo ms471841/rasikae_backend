@@ -17,6 +17,14 @@ export const FIREBASE_APP = 'FIREBASE_APP';
 
         // Handle private key newlines correctly if passed from env
         if (privateKey) {
+          privateKey = privateKey.trim();
+          // Remove potential surrounding quotes from env variables
+          if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+            privateKey = privateKey.substring(1, privateKey.length - 1);
+          }
+          if (privateKey.startsWith("'") && privateKey.endsWith("'")) {
+            privateKey = privateKey.substring(1, privateKey.length - 1);
+          }
           privateKey = privateKey.replace(/\\n/g, '\n');
         }
 
