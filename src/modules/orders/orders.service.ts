@@ -189,7 +189,7 @@ export class OrdersService {
         const restaurant = await this.restaurantModel.findById(order.restaurantId).populate('ownerId').exec();
         if (restaurant && restaurant.ownerId) {
           const owner = restaurant.ownerId as any;
-          
+
           // Socket.io real-time update
           if (owner.firebaseUid) {
             await order.populate([
@@ -202,7 +202,7 @@ export class OrdersService {
           // Push Notification
           await this.notificationsService.sendToUser(owner._id.toString(), {
             title: 'New Order Received! 🍔',
-            body: `You have a new order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount}`,
+            body: `You have a new order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount / 100}`,
             data: { orderId: order._id.toString(), type: 'NEW_ORDER' }
           });
         }
@@ -226,10 +226,10 @@ export class OrdersService {
           this.socketsGateway.emitNewOrder(owner.firebaseUid, order.toJSON ? order.toJSON() : order);
         }
 
-        // Push Notification
+        // Push Notification to vendor
         await this.notificationsService.sendToUser(owner._id.toString(), {
           title: 'New COD Order Received! 💵',
-          body: `New COD order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount}`,
+          body: `New COD order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount / 100}`,
           data: { orderId: order._id.toString(), type: 'NEW_ORDER' }
         });
       }
@@ -320,6 +320,10 @@ export class OrdersService {
   }
 
   async updateOrderStatus(id: string, updateOrderStatusDto: UpdateOrderStatusDto): Promise<Order> {
+    if (updateOrderStatusDto.status === OrderStatus.DELIVERED) {
+      throw new BadRequestException('Status "DELIVERED" cannot be set through this endpoint. Please use the dedicated delivery endpoint.');
+    }
+
     const order = await this.orderModel.findByIdAndUpdate(
       id,
       { status: updateOrderStatusDto.status },
