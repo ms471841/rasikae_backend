@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Wallet, WalletDocument } from './schemas/wallet.schema';
-import { Transaction, TransactionDocument, TransactionType } from './schemas/transaction.schema';
+import { Transaction, TransactionDocument, TransactionType, TransactionStatus } from './schemas/transaction.schema';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { SettingsService } from '../settings/settings.service';
 
@@ -204,11 +204,61 @@ export class WalletsService {
       walletId: wallet._id as Types.ObjectId,
       amount: amount,
       type: TransactionType.WITHDRAWAL,
+      status: TransactionStatus.PENDING,
       description: description || `Withdrawal request for restaurant ${restaurantId}`,
     };
 
     await new this.transactionModel(txData).save();
     return wallet.save();
+  }
+
+  async getPendingWithdrawals(): Promise<Transaction[]> {
+    return this.transactionModel.find({
+      type: TransactionType.WITHDRAWAL,
+      status: TransactionStatus.PENDING,
+    })
+    .populate({
+      path: 'walletId',
+      populate: { path: 'restaurantId', select: 'name' }
+    })
+    .sort({ createdAt: 1 })
+    .exec();
+  }
+
+  async completeWithdrawal(transactionId: string): Promise<TransactionDocument> {
+    const transaction = await this.transactionModel.findById(transactionId).exec();
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
+    }
+    if (transaction.status !== TransactionStatus.PENDING) {
+      throw new BadRequestException('Transaction is not in PENDING status');
+    }
+
+    transaction.status = TransactionStatus.COMPLETED;
+    return transaction.save();
+  }
+
+  async rejectWithdrawal(transactionId: string, reason?: string): Promise<TransactionDocument> {
+    const transaction = await this.transactionModel.findById(transactionId).exec();
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
+    }
+    if (transaction.status !== TransactionStatus.PENDING) {
+      throw new BadRequestException('Transaction is not in PENDING status');
+    }
+
+    // Refund the amount to the wallet
+    const wallet = await this.walletModel.findById(transaction.walletId).exec();
+    if (wallet) {
+      wallet.availableBalance += transaction.amount;
+      await wallet.save();
+    }
+
+    transaction.status = TransactionStatus.REJECTED;
+    if (reason) {
+      transaction.description += ` (Rejected: ${reason})`;
+    }
+    return transaction.save();
   }
 
   async findAllWallets(): Promise<Wallet[]> {

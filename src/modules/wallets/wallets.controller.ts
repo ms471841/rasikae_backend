@@ -69,4 +69,25 @@ export class WalletsController {
   settleBatch(@Body('walletIds') walletIds: string[]) {
     return this.walletsService.settleBatch(walletIds);
   }
+
+  @Get('admin/payout-requests')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  getPendingWithdrawals() {
+    return this.walletsService.getPendingWithdrawals();
+  }
+
+  @Post('admin/payout-requests/:id/complete')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  completeWithdrawal(@Param('id') id: string) {
+    return this.walletsService.completeWithdrawal(id);
+  }
+
+  @Post('admin/payout-requests/:id/reject')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  rejectWithdrawal(@Param('id') id: string, @Body('reason') reason?: string) {
+    return this.walletsService.rejectWithdrawal(id, reason);
+  }
 }

@@ -16,6 +16,13 @@ export enum TransactionType {
   SGST_COLLECTED = 'SGST_COLLECTED',
 }
 
+export enum TransactionStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  REJECTED = 'REJECTED',
+  FAILED = 'FAILED',
+}
+
 @Schema({ timestamps: true })
 export class Transaction {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Wallet', required: true })
@@ -29,6 +36,9 @@ export class Transaction {
 
   @Prop({ type: String, enum: TransactionType, required: true })
   type: string;
+
+  @Prop({ type: String, enum: TransactionStatus, required: true, default: TransactionStatus.COMPLETED })
+  status: string;
 
   @Prop({ required: true })
   description: string;
