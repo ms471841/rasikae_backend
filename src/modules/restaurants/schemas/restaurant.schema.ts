@@ -35,6 +35,9 @@ export class Restaurant {
   name: string;
 
   @Prop()
+  phone?: string;
+
+  @Prop()
   description?: string;
 
   @Prop()
