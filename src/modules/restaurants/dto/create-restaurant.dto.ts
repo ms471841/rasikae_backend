@@ -95,4 +95,12 @@ export class CreateRestaurantDto {
   @Type(() => OperatingHoursDto)
   @IsOptional()
   operatingHours?: OperatingHoursDto;
+
+  @IsString()
+  @IsOptional()
+  gstNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  fssaiNumber?: string;
 }

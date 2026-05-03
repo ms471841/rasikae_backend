@@ -5,11 +5,13 @@ import { Restaurant, RestaurantDocument } from './schemas/restaurant.schema';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { WalletsService } from '../wallets/wallets.service';
+import { Vendor, VendorDocument } from '../vendors/schemas/vendor.schema';
 
 @Injectable()
 export class RestaurantsService {
   constructor(
     @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
+    @InjectModel(Vendor.name) private vendorModel: Model<VendorDocument>,
     private readonly walletsService: WalletsService,
   ) {}
 
@@ -20,8 +22,14 @@ export class RestaurantsService {
     });
     const savedRestaurant = await newRestaurant.save();
     
-    // Auto initiate wallet ledger
+    // 1. Auto initiate wallet ledger
     await this.walletsService.initializeRestaurantWallet(savedRestaurant._id.toString());
+
+    // 2. Link to Vendor Profile
+    await this.vendorModel.updateOne(
+      { userId: new mongoose.Types.ObjectId(ownerId) },
+      { $addToSet: { restaurants: savedRestaurant._id } }
+    ).exec();
 
     return savedRestaurant;
   }

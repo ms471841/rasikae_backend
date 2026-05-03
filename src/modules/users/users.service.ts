@@ -10,6 +10,7 @@ import { UpdateFcmTokenDto, FcmAction } from './dto/update-fcm-token.dto';
 import { Address, AddressDocument } from '../addresses/schemas/address.schema';
 import { Cart, CartDocument } from '../carts/schemas/cart.schema';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
+import { Vendor, VendorDocument } from '../vendors/schemas/vendor.schema';
 
 @Injectable()
 export class UsersService {
@@ -18,6 +19,7 @@ export class UsersService {
     @InjectModel(Address.name) private addressModel: Model<AddressDocument>,
     @InjectModel(Cart.name) private cartModel: Model<CartDocument>,
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
+    @InjectModel(Vendor.name) private vendorModel: Model<VendorDocument>,
     @Inject(FIREBASE_APP) private firebaseApp: admin.app.App,
   ) {}
 
@@ -32,6 +34,11 @@ export class UsersService {
         ...dto,
       });
       await user.save();
+
+      // If new user is a vendor, initialize vendor profile
+      if (user.role === 'vendor') {
+        await this.initializeVendorProfile(user);
+      }
     }
     
     return user;
@@ -169,7 +176,24 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
+    // If role changed to vendor, ensure vendor profile exists
+    if (role === 'vendor') {
+      await this.initializeVendorProfile(user);
+    }
+
     return user;
+  }
+
+  private async initializeVendorProfile(user: UserDocument) {
+    const existingVendor = await this.vendorModel.findOne({ userId: user._id }).exec();
+    if (!existingVendor) {
+      await new this.vendorModel({
+        userId: user._id,
+        businessName: `${user.name}'s Business`,
+        verificationStatus: 'PENDING',
+      }).save();
+    }
   }
   
   async toggleUserActive(id: string): Promise<User> {

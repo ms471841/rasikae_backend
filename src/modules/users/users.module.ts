@@ -6,6 +6,7 @@ import { Address, AddressSchema } from '../addresses/schemas/address.schema';
 import { Cart, CartSchema } from '../carts/schemas/cart.schema';
 import { User, UserSchema } from './schemas/user.schema';
 import { Order, OrderSchema } from '../orders/schemas/order.schema';
+import { Vendor, VendorSchema } from '../vendors/schemas/vendor.schema';
 
 @Global()
 @Module({
@@ -15,6 +16,7 @@ import { Order, OrderSchema } from '../orders/schemas/order.schema';
       { name: Address.name, schema: AddressSchema },
       { name: Cart.name, schema: CartSchema },
       { name: Order.name, schema: OrderSchema },
+      { name: Vendor.name, schema: VendorSchema },
     ]),
   ],
   controllers: [UsersController],
