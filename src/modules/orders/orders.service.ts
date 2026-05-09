@@ -58,7 +58,7 @@ export class OrdersService {
         const transaction = await this.transactionModel.findOne({ 
           userId: new Types.ObjectId(userId),
           $or: [
-            { orderId: { $in: existingOrders.map(o => o._id) } },
+            { orderId: { $in: existingOrders.map((o: any) => o._id) } },
             // Fallback for multicart where orderId might not be directly on transaction
             // in some edge cases if we linked it differently
           ]
@@ -268,7 +268,7 @@ export class OrdersService {
     
     // 1. Find all restaurants owned by the vendor
     const restaurants = await this.restaurantModel.find({ ownerId: new Types.ObjectId(ownerId) }).select('_id').exec();
-    const restaurantIds = restaurants.map(r => r._id);
+    const restaurantIds = restaurants.map((r: any) => r._id);
 
     if (restaurantIds.length === 0) {
       return { data: [], totalItems: 0, totalPages: 0, currentPage: page };
@@ -530,19 +530,21 @@ export class OrdersService {
     const restaurant = await this.restaurantModel.findById(order.restaurantId).exec();
     if (!restaurant) throw new NotFoundException('Restaurant not found for this order.');
     
-    if (!restaurant.location || !restaurant.location.coordinates || restaurant.location.coordinates.length < 2) {
-      throw new BadRequestException('Restaurant does not have valid GPS coordinates defined.');
+    // if (!restaurant.location || !restaurant.location.coordinates || restaurant.location.coordinates.length < 2) {
+    //   throw new BadRequestException('Restaurant does not have valid GPS coordinates defined.');
+    // }
+
+    // const [lng, lat] = restaurant.location.coordinates;
+    // const nearbyDrivers = await this.driversService.findNearbyAvailable(lng, lat, maxDistance);
+
+    const availableDrivers = await this.driversService.findAvailable();
+
+    if (availableDrivers.length === 0) {
+      return { order, message: 'No available drivers found.' };
     }
 
-    const [lng, lat] = restaurant.location.coordinates;
-    const nearbyDrivers = await this.driversService.findNearbyAvailable(lng, lat, maxDistance);
-
-    if (nearbyDrivers.length === 0) {
-      return { order, message: 'No available drivers found within range.' };
-    }
-
-    // Driver array sorted by $nearSphere, so 0 is nearest
-    const matchedDriver = nearbyDrivers[0] as any; 
+    // Pick the first available driver for testing
+    const matchedDriver = availableDrivers[0] as any; 
 
     order.driverId = matchedDriver._id as any;
     order.status = OrderStatus.PREPARING;
