@@ -3,8 +3,7 @@ module.exports = {
     {
       name: "rasikae",
       script: "./dist/main.js", // TypeScript compiled output
-      instances: "max",
-      exec_mode: "cluster",
+      exec_mode: "fork",
       watch: false,
       max_memory_restart: "500M",
       error_file: "./logs/err.log",
