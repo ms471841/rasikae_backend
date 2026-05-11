@@ -11,11 +11,11 @@ import {
   FileTypeValidator
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { S3Service } from '../s3/s3.service';
 
 @Controller('uploads')
 export class UploadsController {
-  constructor(private readonly cloudinaryService: CloudinaryService) {}
+  constructor(private readonly s3Service: S3Service) {}
 
   @Post('image')
   @UseInterceptors(FileInterceptor('file'))
@@ -34,7 +34,7 @@ export class UploadsController {
       throw new BadRequestException('File is required');
     }
     
-    const url = await this.cloudinaryService.uploadFile(file, folder);
+    const url = await this.s3Service.uploadFile(file, folder);
     return { url };
   }
 
@@ -58,7 +58,7 @@ export class UploadsController {
       }
     }
 
-    const uploadPromises = files.map(file => this.cloudinaryService.uploadFile(file, folder));
+    const uploadPromises = files.map(file => this.s3Service.uploadFile(file, folder));
     const urls = await Promise.all(uploadPromises);
     
     return { urls };
