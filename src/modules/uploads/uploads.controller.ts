@@ -180,5 +180,49 @@ export class UploadsController {
     const url = await this.s3Service.uploadFileToKey(file, s3Key);
     return { url };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MASTER DATA entity-scoped endpoints
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * POST /uploads/category/:categoryId/image
+   * S3 key: categories/{categoryId}/image.{ext}
+   * Fixed key → always overwrites the previous category image in-place.
+   */
+  @Post('category/:categoryId/image')
+  @UseGuards(FirebaseAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadCategoryImage(
+    @Param('categoryId') categoryId: string,
+    @UploadedFile(new ParseFilePipe({ validators: IMAGE_VALIDATORS }))
+    file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('File is required');
+    const ext = file.originalname.split('.').pop();
+    const s3Key = `categories/${categoryId}/image.${ext}`;
+    const url = await this.s3Service.uploadFileToKey(file, s3Key);
+    return { url };
+  }
+
+  /**
+   * POST /uploads/cuisine/:cuisineId/image
+   * S3 key: cuisines/{cuisineId}/image.{ext}
+   * Fixed key → always overwrites the previous cuisine image in-place.
+   */
+  @Post('cuisine/:cuisineId/image')
+  @UseGuards(FirebaseAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadCuisineImage(
+    @Param('cuisineId') cuisineId: string,
+    @UploadedFile(new ParseFilePipe({ validators: IMAGE_VALIDATORS }))
+    file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('File is required');
+    const ext = file.originalname.split('.').pop();
+    const s3Key = `cuisines/${cuisineId}/image.${ext}`;
+    const url = await this.s3Service.uploadFileToKey(file, s3Key);
+    return { url };
+  }
 }
 
