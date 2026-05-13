@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -25,30 +25,62 @@ export class S3Service {
     });
   }
 
+  /** Generic upload — generates a UUID filename inside the given folder. */
   async uploadFile(
     file: Express.Multer.File,
     folder: string = 'general'
   ): Promise<string> {
+    const fileExtension = file.originalname.split('.').pop();
+    const s3Key = `${folder}/${uuidv4()}.${fileExtension}`;
+    return this.uploadFileToKey(file, s3Key);
+  }
+
+  /**
+   * Upload a file to a fully-formed S3 key (path + filename).
+   * Use this for entity-scoped paths such as:
+   *   users/{userId}/profile/avatar.jpg
+   *   restaurants/{restaurantId}/logo.jpg
+   *   restaurants/{restaurantId}/cover/{uuid}.jpg
+   *   menu-items/{menuItemId}/image.jpg
+   *   menu-items/{menuItemId}/thumbnail.jpg
+   *
+   * When a fixed key is used (no UUID), re-uploading will overwrite the
+   * previous file in-place — no orphan objects accumulate in S3.
+   */
+  async uploadFileToKey(
+    file: Express.Multer.File,
+    s3Key: string,
+  ): Promise<string> {
     try {
-      const fileExtension = file.originalname.split('.').pop();
-      const fileName = `${folder}/${uuidv4()}.${fileExtension}`;
-      
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
-        Key: fileName,
+        Key: s3Key,
         Body: file.buffer,
         ContentType: file.mimetype,
-        // Depending on bucket setup, you might want to remove ACL: 'public-read'
-        // if the bucket enforces Object Ownership or blocks public ACLs.
-        // We'll omit ACL and rely on bucket policy or signed URLs. Assuming public read for now.
       });
 
       await this.s3Client.send(command);
 
-      // Return the public URL
-      return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${fileName}`;
+      return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${s3Key}`;
     } catch (error) {
       throw new BadRequestException(`S3 upload failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Delete a file from S3 by its key.
+   * Useful for removing old cover images when the vendor removes them from
+   * the restaurant gallery.
+   */
+  async deleteFile(s3Key: string): Promise<void> {
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: s3Key,
+      });
+      await this.s3Client.send(command);
+    } catch (error) {
+      throw new BadRequestException(`S3 delete failed: ${error.message}`);
     }
   }
 }

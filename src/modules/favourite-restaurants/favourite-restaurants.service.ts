@@ -46,16 +46,50 @@ export class FavouriteRestaurantsService {
     return updatedUser.favorites.map(id => id.toString());
   }
 
-  async getFavorites(userId: string): Promise<Restaurant[]> {
-    const user = await this.userModel.findById(userId)
-      .populate('favorites')
-      .exec();
-    
+  /**
+   * Returns favourite restaurants with:
+   *  - categories & cuisines fully populated (via $lookup)
+   *  - dist.calculated attached when lat/lng are provided (via $geoNear)
+   */
+  async getFavorites(
+    userId: string,
+    lat?: number,
+    lng?: number,
+  ): Promise<Restaurant[]> {
+    const user = await this.userModel.findById(userId).select('favorites').exec();
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    return user.favorites as unknown as Restaurant[];
+    const favoriteIds = user.favorites.map(id => new Types.ObjectId(id.toString()));
+    if (favoriteIds.length === 0) return [];
+
+    // Shared $lookup stages — matches the pattern used in findAll / getHomeFeed
+    const populateLookups = [
+      { $lookup: { from: 'categories', localField: 'categories', foreignField: '_id', as: 'categories' } },
+      { $lookup: { from: 'cuisines',   localField: 'cuisines',   foreignField: '_id', as: 'cuisines'   } },
+    ];
+
+    if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
+      // $geoNear must be the first stage; attaches dist.calculated to each doc
+      return this.restaurantModel.aggregate([
+        {
+          $geoNear: {
+            near: { type: 'Point', coordinates: [lng, lat] },
+            distanceField: 'dist.calculated',
+            spherical: true,
+            query: { _id: { $in: favoriteIds } },
+          },
+        },
+        ...populateLookups,
+      ]).exec() as unknown as Restaurant[];
+    }
+
+    // No coordinates — plain match then populate
+    return this.restaurantModel.aggregate([
+      { $match: { _id: { $in: favoriteIds } } },
+      ...populateLookups,
+    ]).exec() as unknown as Restaurant[];
   }
 
   async getFavoriteIds(userId: string): Promise<string[]> {
