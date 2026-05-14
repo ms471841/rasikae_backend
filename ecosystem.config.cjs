@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "rasikae",
+      name: "rasikae-api",
       script: "./dist/main.js", // TypeScript compiled output
       exec_mode: "fork",
       watch: false,

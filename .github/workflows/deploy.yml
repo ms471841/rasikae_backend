@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.13.1"
+          node-version: "22.22.2"
           cache: "npm"
 
       - name: Install dependencies
@@ -74,11 +74,11 @@ jobs:
             ${EC2_USERNAME}@${EC2_HOST} << 'EOF'
             
             # Navigate to app directory
-            cd /var/www/rasikae-qa
+            cd /var/www/rasikae-api
 
             # Fix ownership first (important!)
             echo "Fixing directory ownership..."
-            sudo chown -R $USER:$USER /var/www/rasikae-qa
+            sudo chown -R $USER:$USER /var/www/rasikae-api
             
             
             # Backup current version
@@ -92,11 +92,11 @@ jobs:
             
             # Extract new version (this will overwrite existing files)
             echo "Extracting new deployment package..."
-            tar --overwrite -xzf /tmp/deploy.tar.gz -C /var/www/rasikae-qa
+            tar --overwrite -xzf /tmp/deploy.tar.gz -C /var/www/rasikae-api
             rm /tmp/deploy.tar.gz
 
             # Fix ownership after extraction
-            sudo chown -R $USER:$USER /var/www/rasikae-qa
+            sudo chown -R $USER:$USER /var/www/rasikae-api
             
             
             # Install production dependencies on the server
@@ -115,7 +115,7 @@ jobs:
             mkdir -p logs
             
             # Zero-downtime reload with PM2
-            if pm2 describe rasikae > /dev/null 2>&1; then
+            if pm2 describe rasikae-api > /dev/null 2>&1; then
               echo "Reloading PM2 app (zero-downtime)..."
               pm2 reload ecosystem.config.cjs --update-env
             else
@@ -171,17 +171,17 @@ jobs:
           ssh -i private_key.pem -o StrictHostKeyChecking=no \
             ${EC2_USERNAME}@${EC2_HOST} << 'EOF'
             
-            cd /var/www/rasikae-qa
+            cd /var/www/rasikae-api
 
             # Fix ownership first (important!)
-            sudo chown -R $USER:$USER /var/www/rasikae-qa
+            sudo chown -R $USER:$USER /var/www/rasikae-api
             
             # Find latest backup
             latest_backup=$(ls -t backups/backup_*.tar.gz 2>/dev/null | head -1)
             
             if [ -n "$latest_backup" ]; then
               echo "Found backup: $latest_backup"
-              tar -xzf "$latest_backup" -C /var/www/rasikae-qa
+              tar -xzf "$latest_backup" -C /var/www/rasikae-api
               npm ci
               pm2 reload ecosystem.config.cjs
               echo "✅ Rolled back to previous version"
