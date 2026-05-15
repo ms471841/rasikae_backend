@@ -18,6 +18,7 @@ export enum TransactionType {
 
 export enum TransactionStatus {
   PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
   COMPLETED = 'COMPLETED',
   REJECTED = 'REJECTED',
   FAILED = 'FAILED',
@@ -42,6 +43,9 @@ export class Transaction {
 
   @Prop({ required: true })
   description: string;
+
+  @Prop()
+  razorpayPayoutId?: string;
 
   createdAt: Date;
   updatedAt: Date;

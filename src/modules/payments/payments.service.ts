@@ -161,5 +161,91 @@ export class PaymentsService {
         }
       }
     }
+
+    // Handle payout events
+    if (body.event === 'payout.processed' || body.event === 'payout.reversed' || body.event === 'payout.failed') {
+      const payoutId = body.payload?.payout?.entity?.id;
+      if (payoutId) {
+        const walletTx = await this.walletTxModel.findOne({ razorpayPayoutId: payoutId }).exec();
+        if (walletTx) {
+          if (body.event === 'payout.processed') {
+            walletTx.status = 'COMPLETED'; 
+          } else {
+            walletTx.status = 'FAILED';
+            // refund wallet if it fails
+            const wallet = await this.walletModel.findById(walletTx.walletId).exec();
+            if (wallet) {
+              wallet.availableBalance += walletTx.amount;
+              await wallet.save();
+            }
+          }
+          await walletTx.save();
+        }
+      }
+    }
+  }
+
+  // --- RAZORPAYX PAYOUTS ---
+
+  async createRazorpayContact(name: string, email?: string, contact?: string, referenceId?: string): Promise<any> {
+    if (!this.razorpay) throw new BadRequestException('Razorpay is not configured');
+    try {
+      const contactData = await this.razorpay.contacts.create({
+        name,
+        email,
+        contact,
+        type: 'vendor',
+        reference_id: referenceId,
+      });
+      return contactData;
+    } catch (error: any) {
+      console.error('Razorpay Contact Error:', error);
+      throw new BadRequestException(error?.error?.description || 'Failed to create Razorpay Contact');
+    }
+  }
+
+  async createRazorpayFundAccount(contactId: string, accountName: string, accountNumber: string, ifsc: string): Promise<any> {
+    if (!this.razorpay) throw new BadRequestException('Razorpay is not configured');
+    try {
+      const fundAccountData = await this.razorpay.fundAccount.create({
+        contact_id: contactId,
+        account_type: 'bank_account',
+        bank_account: {
+          name: accountName,
+          ifsc: ifsc,
+          account_number: accountNumber,
+        },
+      });
+      return fundAccountData;
+    } catch (error: any) {
+      console.error('Razorpay Fund Account Error:', error);
+      throw new BadRequestException(error?.error?.description || 'Failed to create Razorpay Fund Account');
+    }
+  }
+
+  async createPayout(fundAccountId: string, amount: number, referenceId: string, purpose: string = 'payout'): Promise<any> {
+    if (!this.razorpay) throw new BadRequestException('Razorpay is not configured');
+    const razorpayXAccountNumber = this.configService.get<string>('RAZORPAYX_ACCOUNT_NUMBER');
+    if (!razorpayXAccountNumber) {
+      throw new BadRequestException('RAZORPAYX_ACCOUNT_NUMBER is not configured in environment variables');
+    }
+
+    try {
+      const payoutData = await this.razorpay.payouts.create({
+        account_number: razorpayXAccountNumber,
+        fund_account_id: fundAccountId,
+        amount: Math.round(amount * 100), // in paisa
+        currency: 'INR',
+        mode: 'IMPS', // or NEFT/RTGS
+        purpose: purpose,
+        queue_if_low_balance: true,
+        reference_id: referenceId,
+        narration: `Payout for ${referenceId}`,
+      });
+      return payoutData;
+    } catch (error: any) {
+      console.error('Razorpay Payout Error:', error);
+      throw new BadRequestException(error?.error?.description || 'Failed to initiate Razorpay Payout');
+    }
   }
 }

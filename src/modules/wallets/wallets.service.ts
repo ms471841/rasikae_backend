@@ -5,13 +5,17 @@ import { Wallet, WalletDocument } from './schemas/wallet.schema';
 import { Transaction, TransactionDocument, TransactionType, TransactionStatus } from './schemas/transaction.schema';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { SettingsService } from '../settings/settings.service';
+import { BankAccount, BankAccountDocument } from '../restaurants/schemas/bank-account.schema';
+import { PaymentsService } from '../payments/payments.service';
 
 @Injectable()
 export class WalletsService {
   constructor(
     @InjectModel(Wallet.name) private walletModel: Model<WalletDocument>,
     @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
+    @InjectModel(BankAccount.name) private bankAccountModel: Model<BankAccountDocument>,
     private readonly settingsService: SettingsService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async initializeWallet(userId: string): Promise<WalletDocument> {
@@ -226,7 +230,7 @@ export class WalletsService {
   }
 
   async completeWithdrawal(transactionId: string): Promise<TransactionDocument> {
-    const transaction = await this.transactionModel.findById(transactionId).exec();
+    const transaction = await this.transactionModel.findById(transactionId).populate('walletId').exec();
     if (!transaction) {
       throw new NotFoundException('Transaction not found');
     }
@@ -234,7 +238,57 @@ export class WalletsService {
       throw new BadRequestException('Transaction is not in PENDING status');
     }
 
-    transaction.status = TransactionStatus.COMPLETED;
+    /*
+    // --- RAZORPAYX PAYOUT LOGIC (TEMPORARILY DISABLED) ---
+    const wallet = transaction.walletId as any;
+    if (!wallet.restaurantId) {
+      throw new BadRequestException('Withdrawal is not linked to a restaurant wallet');
+    }
+
+    // 1. Get Bank Account
+    const bankAccount = await this.bankAccountModel.findOne({ restaurantId: wallet.restaurantId }).exec();
+    if (!bankAccount) {
+      throw new BadRequestException('Restaurant has not provided bank details');
+    }
+
+    // 2. Ensure Razorpay Contact & Fund Account exist
+    if (!bankAccount.razorpayContactId) {
+      const contact = await this.paymentsService.createRazorpayContact(
+        bankAccount.bankAccountName,
+        undefined, // email
+        undefined, // phone
+        wallet.restaurantId.toString()
+      );
+      bankAccount.razorpayContactId = contact.id;
+      await bankAccount.save();
+    }
+
+    if (!bankAccount.razorpayFundAccountId) {
+      const fundAccount = await this.paymentsService.createRazorpayFundAccount(
+        bankAccount.razorpayContactId!,
+        bankAccount.bankAccountName,
+        bankAccount.bankAccountNumber,
+        bankAccount.bankIfscCode
+      );
+      bankAccount.razorpayFundAccountId = fundAccount.id;
+      await bankAccount.save();
+    }
+
+    // 3. Initiate Payout
+    const payout = await this.paymentsService.createPayout(
+      bankAccount.razorpayFundAccountId!,
+      transaction.amount,
+      transaction._id.toString(),
+      'payout'
+    );
+
+    transaction.status = TransactionStatus.PROCESSING as any; // Wait for webhook to mark COMPLETED
+    transaction.razorpayPayoutId = payout.id;
+    return transaction.save();
+    // --- END RAZORPAYX PAYOUT LOGIC ---
+    */
+
+    transaction.status = TransactionStatus.COMPLETED as any;
     return transaction.save();
   }
 

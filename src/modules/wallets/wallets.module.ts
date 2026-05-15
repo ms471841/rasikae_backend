@@ -5,14 +5,18 @@ import { WalletsController } from './wallets.controller';
 import { Wallet, WalletSchema } from './schemas/wallet.schema';
 import { Transaction, TransactionSchema } from './schemas/transaction.schema';
 import { SettingsModule } from '../settings/settings.module';
+import { BankAccount, BankAccountSchema } from '../restaurants/schemas/bank-account.schema';
+import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Wallet.name, schema: WalletSchema },
       { name: Transaction.name, schema: TransactionSchema },
+      { name: BankAccount.name, schema: BankAccountSchema },
     ]),
     SettingsModule,
+    PaymentsModule,
   ],
   controllers: [WalletsController],
   providers: [WalletsService],

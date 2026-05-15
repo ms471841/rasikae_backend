@@ -115,6 +115,21 @@ export class RestaurantsController {
     return this.restaurantsService.update(id, updateRestaurantDto);
   }
 
+  @Get(':id/bank-account')
+  @UseGuards(FirebaseAuthGuard)
+  async getBankAccount(@Param('id') id: string) {
+    return this.restaurantsService.getBankAccount(id);
+  }
+
+  @Post(':id/bank-account')
+  @UseGuards(FirebaseAuthGuard)
+  async upsertBankAccount(
+    @Param('id') id: string,
+    @Body() bankAccountData: any,
+  ) {
+    return this.restaurantsService.upsertBankAccount(id, bankAccountData);
+  }
+
   @Delete(':id')
   @UseGuards(FirebaseAuthGuard)
   async remove(@Param('id') id: string) {

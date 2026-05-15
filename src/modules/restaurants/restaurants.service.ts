@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import { Restaurant, RestaurantDocument } from './schemas/restaurant.schema';
+import { BankAccount, BankAccountDocument } from './schemas/bank-account.schema';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { WalletsService } from '../wallets/wallets.service';
@@ -12,6 +13,7 @@ export class RestaurantsService {
   constructor(
     @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
     @InjectModel(Vendor.name) private vendorModel: Model<VendorDocument>,
+    @InjectModel(BankAccount.name) private bankAccountModel: Model<BankAccountDocument>,
     private readonly walletsService: WalletsService,
   ) {}
 
@@ -191,5 +193,27 @@ export class RestaurantsService {
     }
 
     return deletedRestaurant;
+  }
+
+  async getBankAccount(restaurantId: string): Promise<BankAccount> {
+    const bankAccount = await this.bankAccountModel.findOne({ restaurantId: new mongoose.Types.ObjectId(restaurantId) }).exec();
+    if (!bankAccount) {
+      throw new NotFoundException(`Bank account for restaurant ${restaurantId} not found`);
+    }
+    return bankAccount;
+  }
+
+  async upsertBankAccount(restaurantId: string, data: any): Promise<BankAccount> {
+    // Check if restaurant exists and belongs to user if needed (handled in controller via guards usually, but we assume valid restaurantId here)
+    const existing = await this.bankAccountModel.findOne({ restaurantId: new mongoose.Types.ObjectId(restaurantId) }).exec();
+    if (existing) {
+      Object.assign(existing, data);
+      return existing.save();
+    }
+    const newAccount = new this.bankAccountModel({
+      ...data,
+      restaurantId: new mongoose.Types.ObjectId(restaurantId)
+    });
+    return newAccount.save();
   }
 }
