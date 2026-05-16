@@ -142,6 +142,12 @@ export class Order {
   @Prop({ required: false, index: true })
   idempotencyKey?: string;
 
+  @Prop({ required: false })
+  deliveredAt?: Date;
+
+  @Prop({ required: false })
+  actualDeliveryTimeMinutes?: number;
+
   createdAt: Date;
   updatedAt: Date;
 }

@@ -488,11 +488,43 @@ export class OrdersService {
       throw new BadRequestException(`Cannot deliver an order in ${order.status} status.`);
     }
 
+    const deliveredAt = new Date();
+    const durationMinutes = Math.round(
+      (deliveredAt.getTime() - (order.createdAt as any).getTime()) / 60000
+    );
+
     order.status = OrderStatus.DELIVERED;
+    order.deliveredAt = deliveredAt;
+    order.actualDeliveryTimeMinutes = durationMinutes;
     if (order.paymentMethod === 'COD') {
       order.paymentStatus = 'PAID';
     }
     await order.save();
+
+    // Update restaurant's rolling delivery time average
+    if (durationMinutes > 0 && durationMinutes < 180) { // Ignore outliers > 3 hours
+      await this.restaurantModel.findByIdAndUpdate(
+        order.restaurantId,
+        {
+          $inc: {
+            totalDeliveryTimeMinutes: durationMinutes,
+            deliveryCount: 1,
+          },
+        },
+      ).exec();
+
+      // Recompute and save the deliveryTime on the restaurant
+      const restaurant = await this.restaurantModel.findById(order.restaurantId).exec();
+      if (restaurant && restaurant.deliveryCount && restaurant.deliveryCount > 0) {
+        const avgMinutes = Math.round(
+          (restaurant.totalDeliveryTimeMinutes ?? 0) / restaurant.deliveryCount
+        );
+        await this.restaurantModel.findByIdAndUpdate(
+          order.restaurantId,
+          { deliveryTime: avgMinutes }
+        ).exec();
+      }
+    }
 
     // Trigger phase 2 earning mechanisms securely!
     if (order.driverId || driverId) {

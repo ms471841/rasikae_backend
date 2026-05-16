@@ -96,6 +96,13 @@ export class Restaurant {
 
   @Prop()
   fssaiNumber?: string;
+
+  // Dynamic delivery time tracking (rolling average from actual deliveries)
+  @Prop({ default: 0 })
+  totalDeliveryTimeMinutes?: number;
+
+  @Prop({ default: 0 })
+  deliveryCount?: number;
 }
 
 export const RestaurantSchema = SchemaFactory.createForClass(Restaurant);
