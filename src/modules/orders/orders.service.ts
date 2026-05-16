@@ -238,11 +238,26 @@ export class OrdersService {
     return { orders: createdOrders };
   }
 
-  async getUserOrders(userId: string): Promise<Order[]> {
-    return this.orderModel.find({ userId: new Types.ObjectId(userId) })
-      .populate('restaurantId', 'name logo coverImages rating address')
-      .sort({ createdAt: -1 })
-      .exec();
+  async getUserOrders(userId: string, page: number = 1, limit: number = 20): Promise<any> {
+    const skip = (page - 1) * limit;
+    const [data, totalItems] = await Promise.all([
+      this.orderModel.find({ userId: new Types.ObjectId(userId) })
+        .populate('restaurantId', 'name logo coverImages rating address location')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.orderModel.countDocuments({ userId: new Types.ObjectId(userId) }).exec()
+    ]);
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data,
+      totalItems,
+      totalPages,
+      currentPage: page
+    };
   }
 
   async getRestaurantOrders(restaurantId: string): Promise<Order[]> {
@@ -257,7 +272,7 @@ export class OrdersService {
       driverId: new Types.ObjectId(driverId),
       status: { $in: [OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY] }
     })
-    .populate('restaurantId', 'name logo address phone')
+    .populate('restaurantId', 'name logo address phone location')
     .populate('userId', 'name phone email')
     .sort({ createdAt: -1 })
     .exec();

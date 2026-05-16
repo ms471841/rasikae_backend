@@ -30,8 +30,14 @@ export class OrdersController {
   }
 
   @Get('my-orders')
-  findAll(@CurrUser() user: any) {
-    return this.ordersService.getUserOrders(user._id.toString());
+  findAll(
+    @CurrUser() user: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedPage = Math.max(1, page ? parseInt(page, 10) : 1);
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    return this.ordersService.getUserOrders(user._id.toString(), parsedPage, parsedLimit);
   }
 
   @Get('all')
