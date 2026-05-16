@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document } from 'mongoose';
 
-export type TransactionDocument = Transaction & Document;
+export type PaymentTransactionDocument = PaymentTransaction & Document;
 
 export enum TransactionStatus {
   PENDING = 'PENDING',
@@ -15,8 +15,8 @@ export enum TransactionType {
   REFUND = 'REFUND',
 }
 
-@Schema({ timestamps: true })
-export class Transaction {
+@Schema({ timestamps: true, collection: 'paymenttransactions' })
+export class PaymentTransaction {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   userId: mongoose.Types.ObjectId;
 
@@ -48,4 +48,4 @@ export class Transaction {
   metadata?: any;
 }
 
-export const TransactionSchema = SchemaFactory.createForClass(Transaction);
+export const PaymentTransactionSchema = SchemaFactory.createForClass(PaymentTransaction);

@@ -1,7 +1,7 @@
 import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Transaction, TransactionDocument, TransactionStatus, TransactionType } from './schemas/transaction.schema';
+import { PaymentTransaction, PaymentTransactionDocument, TransactionStatus, TransactionType } from './schemas/transaction.schema';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { Wallet, WalletDocument } from '../wallets/schemas/wallet.schema';
 import { Transaction as WalletTransaction, TransactionDocument as WalletTransactionDocument, TransactionType as WalletTxType } from '../wallets/schemas/transaction.schema';
@@ -12,7 +12,7 @@ import * as crypto from 'crypto';
 export class PaymentsService {
   constructor(
     @Inject('RAZORPAY_INSTANCE') private readonly razorpay: any,
-    @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
+    @InjectModel(PaymentTransaction.name) private transactionModel: Model<PaymentTransactionDocument>,
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(Wallet.name) private walletModel: Model<WalletDocument>,
     @InjectModel(WalletTransaction.name) private walletTxModel: Model<WalletTransactionDocument>,
