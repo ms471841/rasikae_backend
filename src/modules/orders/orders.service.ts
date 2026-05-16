@@ -16,7 +16,7 @@ import { SocketsGateway } from '../sockets/sockets.gateway';
 import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
-import { Transaction, TransactionDocument, TransactionType } from '../payments/schemas/transaction.schema';
+import { PaymentTransaction, PaymentTransactionDocument, TransactionType } from '../payments/schemas/transaction.schema';
 import { UsersService } from '../users/users.service';
 
 @Injectable()
@@ -25,7 +25,7 @@ export class OrdersService {
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
     @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
-    @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
+    @InjectModel(PaymentTransaction.name) private transactionModel: Model<PaymentTransactionDocument>,
     private readonly cartsService: CartsService,
     private readonly driversService: DriversService,
     private readonly walletsService: WalletsService,

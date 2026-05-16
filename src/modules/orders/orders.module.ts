@@ -6,7 +6,7 @@ import { InvoicesService } from './invoices.service';
 import { Order, OrderSchema } from './schemas/order.schema';
 import { MenuItem, MenuItemSchema } from '../menu-items/schemas/menu-item.schema';
 import { Restaurant, RestaurantSchema } from '../restaurants/schemas/restaurant.schema';
-import { Transaction, TransactionSchema } from '../payments/schemas/transaction.schema';
+import { PaymentTransaction, PaymentTransactionSchema } from '../payments/schemas/transaction.schema';
 import { CartsModule } from '../carts/carts.module';
 import { DriversModule } from '../drivers/drivers.module';
 import { WalletsModule } from '../wallets/wallets.module';
@@ -22,7 +22,7 @@ import { forwardRef } from '@nestjs/common';
       { name: Order.name, schema: OrderSchema },
       { name: MenuItem.name, schema: MenuItemSchema },
       { name: Restaurant.name, schema: RestaurantSchema },
-      { name: Transaction.name, schema: TransactionSchema },
+      { name: PaymentTransaction.name, schema: PaymentTransactionSchema },
     ]),
     CartsModule,
     DriversModule,
