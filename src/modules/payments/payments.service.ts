@@ -19,7 +19,7 @@ export class PaymentsService {
     private readonly configService: ConfigService,
   ) {}
 
-  async createRazorpayOrder(userId: string, amount: number, type: TransactionType, orderId?: string) {
+  async createRazorpayOrder(userId: string, amount: number, type: TransactionType, orderId?: string, orderIds?: string[], snapshotPayload?: any) {
     if (!this.razorpay) {
       throw new BadRequestException('Razorpay is not configured. Please add keys to .env');
     }
@@ -29,11 +29,7 @@ export class PaymentsService {
         amount: Math.round(amount * 100), // convert to paisa
         currency: 'INR',
         receipt: `receipt_${Date.now()}`,
-        notes: {
-          userId,
-          type,
-          orderId: orderId || '',
-        },
+        notes: { userId, type, orderId: orderId || '' },
       };
 
       const razorpayOrder = await this.razorpay.orders.create(options);
@@ -45,7 +41,11 @@ export class PaymentsService {
         orderId: orderId ? new Types.ObjectId(orderId) : undefined,
         razorpayOrderId: razorpayOrder.id,
         status: TransactionStatus.PENDING,
-        metadata: razorpayOrder,
+        metadata: {
+          ...razorpayOrder,
+          orderIds: orderIds ?? (orderId ? [orderId] : []),
+          ...(snapshotPayload ?? {}),
+        },
       });
 
       await transaction.save();
@@ -61,6 +61,7 @@ export class PaymentsService {
       throw new BadRequestException('Failed to initiate payment with Razorpay');
     }
   }
+
 
   async verifyPaymentSignature(
     razorpayOrderId: string,
@@ -99,15 +100,16 @@ export class PaymentsService {
 
     // Side Effects based on Transaction Type
     if (transaction.type === TransactionType.ORDER_PAYMENT) {
-      // If it's a direct order payment, mark the order(s) as PAID
-      if (transaction.orderId) {
-        await this.orderModel.findByIdAndUpdate(transaction.orderId, { paymentStatus: 'PAID' }).exec();
-      } else {
-        // If there are multiple orders linked to this payment (grouped by restaurant)
-        // We might need to find all orders for this user created around the same time
-        // For now, if orderId is missing in transaction, we assume it's a session-based grouping
-        // A better way would be to store an array of orderIds in the Transaction metadata
-        console.log('Bulk order payment detected, updating payment status.');
+      // Resolve all orderIds linked to this payment
+      const orderIds: string[] = transaction.metadata?.orderIds ?? 
+        (transaction.orderId ? [transaction.orderId.toString()] : []);
+
+      if (orderIds.length > 0) {
+        // Activate the orders: transition from AWAITING_PAYMENT → PENDING and mark as PAID
+        await this.orderModel.updateMany(
+          { _id: { $in: orderIds } },
+          { $set: { status: 'PENDING', paymentStatus: 'PAID' } },
+        ).exec();
       }
     } else if (transaction.type === TransactionType.WALLET_TOPUP) {
       // If it's a wallet top-up, credit the wallet

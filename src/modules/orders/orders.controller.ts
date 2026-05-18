@@ -124,5 +124,26 @@ export class OrdersController {
     return this.ordersService.autoAssignDriver(id);
   }
 
+  // ─── Online Payment Flow ────────────────────────────────────────────
+  // Step 1: compute totals from cart, create Razorpay session (no DB order created)
+  @Post('initiate-payment')
+  initiatePayment(@CurrUser() user: any, @Body() checkoutDto: CheckoutDto) {
+    return this.ordersService.initiatePayment(user._id.toString(), checkoutDto);
+  }
+
+  // Step 2: verify signature → create order → clear cart → notify restaurant
+  @Post('confirm-payment')
+  confirmPayment(
+    @CurrUser() user: any,
+    @Body() body: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+  ) {
+    return this.ordersService.confirmPayment(
+      user._id.toString(),
+      body.razorpayOrderId,
+      body.razorpayPaymentId,
+      body.razorpaySignature,
+    );
+  }
 
 }
+

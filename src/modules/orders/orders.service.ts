@@ -171,53 +171,11 @@ export class OrdersService {
       createdOrders.push(createdOrder);
     }
 
-    // Clear cart upon successful order placement
-    await this.cartsService.clearCart(userId);
-
-    // If online payment (not COD), generate Razorpay Order for the total amount
-    if (paymentMethod !== 'COD') {
-      const grandTotal = createdOrders.reduce((acc, order) => acc + order.totalAmount, 0);
-      const paymentData = await this.paymentsService.createRazorpayOrder(
-        userId,
-        grandTotal,
-        TransactionType.ORDER_PAYMENT,
-        createdOrders.length === 1 ? createdOrders[0]._id.toString() : undefined // Link total if single restaurant
-      );
-      
-      // Notify Restaurant Owners about NEW order
-      for (const order of createdOrders) {
-        const restaurant = await this.restaurantModel.findById(order.restaurantId).populate('ownerId').exec();
-        if (restaurant && restaurant.ownerId) {
-          const owner = restaurant.ownerId as any;
-
-          // Socket.io real-time update
-          if (owner.firebaseUid) {
-            await order.populate([
-              { path: 'restaurantId', select: 'name logo address' },
-              { path: 'userId', select: 'name phone email' }
-            ]);
-            this.socketsGateway.emitNewOrder(owner.firebaseUid, order.toJSON ? order.toJSON() : order);
-          }
-
-          // Push Notification
-          await this.notificationsService.sendToUser(owner._id.toString(), {
-            title: 'New Order Received! 🍔',
-            body: `You have a new order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount / 100}`,
-            data: { orderId: order._id.toString(), type: 'NEW_ORDER' }
-          });
-        }
-      }
-
-      return { orders: createdOrders, paymentData };
-    }
-
-    // Notify Restaurant Owners about NEW COD order
+    // Notify Restaurant Owners about this COD order
     for (const order of createdOrders) {
       const restaurant = await this.restaurantModel.findById(order.restaurantId).populate('ownerId').exec();
       if (restaurant && restaurant.ownerId) {
         const owner = restaurant.ownerId as any;
-
-        // Socket.io real-time update
         if (owner.firebaseUid) {
           await order.populate([
             { path: 'restaurantId', select: 'name logo address' },
@@ -225,11 +183,189 @@ export class OrdersService {
           ]);
           this.socketsGateway.emitNewOrder(owner.firebaseUid, order.toJSON ? order.toJSON() : order);
         }
-
-        // Push Notification to vendor
         await this.notificationsService.sendToUser(owner._id.toString(), {
           title: 'New COD Order Received! 💵',
           body: `New COD order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount / 100}`,
+          data: { orderId: order._id.toString(), type: 'NEW_ORDER' }
+        });
+      }
+    }
+
+    await this.cartsService.clearCart(userId);
+    return { orders: createdOrders };
+  }
+
+  // ─── Step 1 (Online payment): Compute totals, create Razorpay session, return it.
+  // No order is created in the DB yet.
+  async initiatePayment(userId: string, checkoutDto: CheckoutDto): Promise<any> {
+    const { deliveryAddress, idempotencyKey } = checkoutDto;
+
+    const settings = await this.settingsService.getSettings();
+    if (settings.isMaintenanceMode) {
+      throw new BadRequestException(settings.maintenanceMessage || 'Platform is currently under maintenance.');
+    }
+
+    const cart = await this.cartsService.getCart(userId);
+    if (!cart || cart.items.length === 0) {
+      throw new BadRequestException('Cannot initiate payment with an empty cart');
+    }
+
+    // Build order snapshots (same logic as checkout, but no DB writes)
+    const itemsByRestaurant = new Map<string, any[]>();
+    for (const item of cart.items) {
+      const restaurantIdStr = typeof item.restaurantId === 'object' && (item.restaurantId as any)._id
+        ? (item.restaurantId as any)._id.toString()
+        : item.restaurantId.toString();
+
+      let restaurantItems = itemsByRestaurant.get(restaurantIdStr);
+      if (!restaurantItems) {
+        restaurantItems = [];
+        itemsByRestaurant.set(restaurantIdStr, restaurantItems);
+      }
+
+      const menuItemIdStr = typeof item.menuItemId === 'object' && (item.menuItemId as any)._id
+        ? (item.menuItemId as any)._id.toString()
+        : item.menuItemId.toString();
+
+      const menuItem = await this.menuItemModel.findById(menuItemIdStr).exec();
+      restaurantItems.push({
+        menuItemId: menuItemIdStr,
+        name: menuItem ? menuItem.name : 'Unknown Item',
+        quantity: item.quantity,
+        price: item.price,
+        variant: item.variant,
+        addons: item.addons,
+        packagingCharge: menuItem?.packagingChargeInPaise ?? 0,
+        totalItemPrice: item.totalItemPrice,
+        originalPrice: menuItem?.discountPrice ?? item.price,
+      });
+    }
+
+    const orderSnapshots: any[] = [];
+    let grandTotal = 0;
+
+    for (const [restaurantIdStr, items] of itemsByRestaurant.entries()) {
+      const subTotal = items.reduce((acc, i) => acc + i.totalItemPrice, 0);
+
+      if (subTotal < settings.minOrderValue) {
+        throw new BadRequestException(`Order from restaurant must be at least ₹${settings.minOrderValue / 100}`);
+      }
+
+      const staticTax = Math.round(subTotal * settings.taxPercentage);
+      const cgst = Math.round(staticTax / 2);
+      const sgst = staticTax - cgst;
+      const deliveryFee = settings.deliveryBaseFee;
+      const packagingFee = items.reduce((acc, i) => acc + (i.packagingCharge || 0) * i.quantity, 0);
+      const discountAmount = items.reduce((acc, i) => {
+        return acc + ((i.originalPrice > i.price) ? (i.originalPrice - i.price) * i.quantity : 0);
+      }, 0);
+      const totalAmount = subTotal + staticTax + deliveryFee + packagingFee;
+
+      grandTotal += totalAmount;
+      orderSnapshots.push({
+        restaurantId: restaurantIdStr,
+        items,
+        deliveryAddress,
+        subTotal,
+        tax: staticTax,
+        cgst,
+        sgst,
+        deliveryFee,
+        packagingFee,
+        discountAmount,
+        totalAmount,
+        paymentMethod: 'ONLINE',
+        idempotencyKey,
+      });
+    }
+
+    // Create Razorpay session — store the full order snapshot in metadata
+    const paymentData = await this.paymentsService.createRazorpayOrder(
+      userId,
+      grandTotal,
+      TransactionType.ORDER_PAYMENT,
+      undefined,
+      undefined,
+      { orderSnapshots, userId, idempotencyKey },
+    );
+
+    return paymentData;
+  }
+
+  // ─── Step 2 (Online payment): Verify signature → create orders → clear cart → notify restaurant.
+  async confirmPayment(
+    userId: string,
+    razorpayOrderId: string,
+    razorpayPaymentId: string,
+    razorpaySignature: string,
+  ): Promise<{ orders: OrderDocument[] }> {
+    // 1. Verify signature
+    const isValid = await this.paymentsService.verifyPaymentSignature(
+      razorpayOrderId, razorpayPaymentId, razorpaySignature,
+    );
+    if (!isValid) throw new BadRequestException('Invalid payment signature');
+
+    // 2. Load transaction and snapshot
+    const transaction = await this.transactionModel.findOne({ razorpayOrderId }).exec();
+    if (!transaction) throw new NotFoundException('Transaction not found');
+    if (transaction.status === 'SUCCESS') {
+      // Idempotent: return orders that were already created
+      const existingOrders = await this.orderModel.find({ idempotencyKey: transaction.metadata?.idempotencyKey }).exec();
+      return { orders: existingOrders };
+    }
+
+    const { orderSnapshots } = transaction.metadata as any;
+    if (!orderSnapshots?.length) throw new BadRequestException('No order data found in payment session');
+
+    // 3. Create orders from snapshot
+    const createdOrders: OrderDocument[] = [];
+    for (const snap of orderSnapshots) {
+      const order = new this.orderModel({
+        userId: new Types.ObjectId(userId),
+        restaurantId: new Types.ObjectId(snap.restaurantId),
+        items: snap.items.map((i: any) => ({ ...i, menuItemId: new Types.ObjectId(i.menuItemId) })),
+        deliveryAddress: snap.deliveryAddress,
+        subTotal: snap.subTotal,
+        tax: snap.tax,
+        cgst: snap.cgst,
+        sgst: snap.sgst,
+        deliveryFee: snap.deliveryFee,
+        packagingFee: snap.packagingFee,
+        discountAmount: snap.discountAmount,
+        totalAmount: snap.totalAmount,
+        status: OrderStatus.PENDING,
+        paymentMethod: 'ONLINE',
+        paymentStatus: 'PAID',
+        idempotencyKey: snap.idempotencyKey,
+      });
+      await order.save();
+      createdOrders.push(order);
+    }
+
+    // 4. Mark transaction as success
+    transaction.status = 'SUCCESS' as any;
+    transaction.razorpayPaymentId = razorpayPaymentId;
+    transaction.razorpaySignature = razorpaySignature;
+    await transaction.save();
+
+    // 5. Clear cart
+    await this.cartsService.clearCart(userId);
+
+    // 6. Notify restaurants
+    for (const order of createdOrders) {
+      const restaurant = await this.restaurantModel.findById(order.restaurantId).populate('ownerId').exec();
+      if (restaurant && restaurant.ownerId) {
+        const owner = restaurant.ownerId as any;
+        if (owner.firebaseUid) {
+          await order.populate([
+            { path: 'restaurantId', select: 'name logo address' },
+            { path: 'userId', select: 'name phone email' }
+          ]);
+          this.socketsGateway.emitNewOrder(owner.firebaseUid, order.toJSON ? order.toJSON() : order);
+        }
+        await this.notificationsService.sendToUser(owner._id.toString(), {
+          title: 'New Order Received! 🎉',
+          body: `Online order (#${order._id.toString().slice(-6)}) for ₹${order.totalAmount / 100}`,
           data: { orderId: order._id.toString(), type: 'NEW_ORDER' }
         });
       }
