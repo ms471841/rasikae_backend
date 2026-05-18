@@ -26,7 +26,7 @@ export class PaymentsService {
 
     try {
       const options = {
-        amount: Math.round(amount * 100), // convert to paisa
+        amount: Math.round(amount), // Already in paise
         currency: 'INR',
         receipt: `receipt_${Date.now()}`,
         notes: { userId, type, orderId: orderId || '' },
@@ -236,7 +236,7 @@ export class PaymentsService {
       const payoutData = await this.razorpay.payouts.create({
         account_number: razorpayXAccountNumber,
         fund_account_id: fundAccountId,
-        amount: Math.round(amount * 100), // in paisa
+        amount: Math.round(amount), // Already in paise
         currency: 'INR',
         mode: 'IMPS', // or NEFT/RTGS
         purpose: purpose,
