@@ -11,8 +11,8 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
-  // @UseGuards(FirebaseAuthGuard, RolesGuard)
-  // @Roles('admin')
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
   create(@Body() createCategoryDto: CreateCategoryDto) {
     return this.categoriesService.create(createCategoryDto);
   }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -396,7 +396,13 @@ export class OrdersService {
     };
   }
 
-  async getRestaurantOrders(restaurantId: string): Promise<Order[]> {
+  async getRestaurantOrders(restaurantId: string, currentUser?: any): Promise<Order[]> {
+    if (currentUser && currentUser.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(restaurantId).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to view orders for this restaurant');
+      }
+    }
     return this.orderModel.find({ restaurantId: new Types.ObjectId(restaurantId) })
       .populate('userId', 'name phone email')
       .sort({ createdAt: -1 })
@@ -454,9 +460,9 @@ export class OrdersService {
     };
   }
 
-  async getOrderById(id: string): Promise<Order> {
+  async getOrderById(id: string, currentUser?: any): Promise<Order> {
     const order = await this.orderModel.findById(id)
-      .populate('restaurantId', 'name logo coverImages rating address location')
+      .populate('restaurantId', 'name logo coverImages rating address location ownerId')
       .populate('userId', 'name phone email')
       .populate({
         path: 'driverId',
@@ -467,12 +473,63 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
+
+    if (currentUser && currentUser.role !== 'admin') {
+      const orderPlacerId = this.extractId(order.userId);
+      const isCustomer = orderPlacerId === currentUser._id.toString();
+      
+      const restaurantOwnerId = (order.restaurantId as any)?.ownerId?.toString();
+      const isVendor = restaurantOwnerId === currentUser._id.toString();
+
+      let isDriverObj = false;
+      if (order.driverId) {
+        try {
+          const driver = await this.driversService.findByUserId(currentUser._id.toString());
+          if (driver && order.driverId._id.toString() === driver._id.toString()) {
+            isDriverObj = true;
+          }
+        } catch (e) {}
+      }
+
+      if (!isCustomer && !isVendor && !isDriverObj) {
+        throw new ForbiddenException('You are not authorized to view this order');
+      }
+    }
+
     return order;
   }
 
-  async updateOrderStatus(id: string, updateOrderStatusDto: UpdateOrderStatusDto): Promise<Order> {
+  async updateOrderStatus(id: string, updateOrderStatusDto: UpdateOrderStatusDto, currentUser?: any): Promise<Order> {
     if (updateOrderStatusDto.status === OrderStatus.DELIVERED) {
       throw new BadRequestException('Status "DELIVERED" cannot be set through this endpoint. Please use the dedicated delivery endpoint.');
+    }
+
+    if (currentUser && currentUser.role !== 'admin') {
+      const orderObj = await this.orderModel.findById(id).populate('restaurantId').exec();
+      if (!orderObj) {
+        throw new NotFoundException(`Order with ID ${id} not found`);
+      }
+
+      const isCustomer = orderObj.userId.toString() === currentUser._id.toString();
+      const isVendor = (orderObj.restaurantId as any).ownerId.toString() === currentUser._id.toString();
+
+      let isDriverObj = false;
+      if (orderObj.driverId) {
+        try {
+          const driver = await this.driversService.findByUserId(currentUser._id.toString());
+          if (driver && orderObj.driverId.toString() === driver._id.toString()) {
+            isDriverObj = true;
+          }
+        } catch (e) {}
+      }
+
+      const canCancel = isCustomer && 
+                        updateOrderStatusDto.status === OrderStatus.CANCELLED && 
+                        orderObj.status === OrderStatus.PENDING;
+
+      if (!isVendor && !isDriverObj && !canCancel) {
+        throw new ForbiddenException('You are not authorized to update this order status');
+      }
     }
 
     const order = await this.orderModel.findByIdAndUpdate(
@@ -542,8 +599,28 @@ export class OrdersService {
     return order;
   }
 
-  async assignDriver(id: string, assignDriverDto: AssignDriverDto): Promise<Order> {
+  async assignDriver(id: string, assignDriverDto: AssignDriverDto, currentUser?: any): Promise<Order> {
     const { driverId } = assignDriverDto;
+
+    if (currentUser && currentUser.role !== 'admin') {
+      const orderObj = await this.orderModel.findById(id).populate('restaurantId').exec();
+      if (!orderObj) {
+        throw new NotFoundException(`Order with ID ${id} not found`);
+      }
+      
+      const isVendor = (orderObj.restaurantId as any).ownerId.toString() === currentUser._id.toString();
+      let isTargetDriver = false;
+      try {
+        const driver = await this.driversService.findByUserId(currentUser._id.toString());
+        if (driver && driver._id.toString() === driverId) {
+          isTargetDriver = true;
+        }
+      } catch (e) {}
+
+      if (!isVendor && !isTargetDriver) {
+        throw new ForbiddenException('You are not authorized to assign drivers to this order');
+      }
+    }
 
     // Verify driver exists and is available
     const driver = await this.driversService.findOne(driverId);
@@ -702,7 +779,25 @@ export class OrdersService {
 
   }
 
-  async autoAssignDriver(id: string, maxDistance: number = 10000): Promise<{ order: Order, driverId?: string, message: string }> {
+  async autoAssignDriver(id: string, maxDistanceOrUser: number | any = 10000, currentUser?: any): Promise<{ order: Order, driverId?: string, message: string }> {
+    let resolvedMaxDistance = 10000;
+    let resolvedCurrentUser = currentUser;
+    if (typeof maxDistanceOrUser === 'number') {
+      resolvedMaxDistance = maxDistanceOrUser;
+    } else {
+      resolvedCurrentUser = maxDistanceOrUser;
+    }
+
+    if (resolvedCurrentUser && resolvedCurrentUser.role !== 'admin') {
+      const orderObj = await this.orderModel.findById(id).populate('restaurantId').exec();
+      if (!orderObj) {
+        throw new NotFoundException(`Order with ID ${id} not found`);
+      }
+      if ((orderObj.restaurantId as any).ownerId.toString() !== resolvedCurrentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to auto-assign a driver to this order');
+      }
+    }
+
     const order = await this.orderModel.findById(id).exec();
     if (!order) throw new NotFoundException(`Order with ID ${id} not found`);
 

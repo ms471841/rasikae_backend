@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
@@ -102,10 +102,21 @@ export class AnalyticsService {
     return result;
   }
 
-  async getRestaurantDashboardStats(restaurantId: string) {
+  async getRestaurantDashboardStats(restaurantId: string, currentUser?: any) {
     if (!Types.ObjectId.isValid(restaurantId)) {
       throw new BadRequestException('Invalid restaurant identifier format');
     }
+
+    if (currentUser && currentUser.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(restaurantId).exec();
+      if (!restaurant) {
+        throw new NotFoundException(`Restaurant with ID ${restaurantId} not found`);
+      }
+      if (restaurant.ownerId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to view analytics for this restaurant');
+      }
+    }
+
     const objectId = new Types.ObjectId(restaurantId);
 
     const [revenueStats, orderCounts, topItems] = await Promise.all([

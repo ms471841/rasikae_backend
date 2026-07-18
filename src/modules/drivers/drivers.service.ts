@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import * as admin from 'firebase-admin';
@@ -20,7 +20,10 @@ export class DriversService {
     private readonly usersService: UsersService,
   ) {}
 
-  async create(createDriverDto: CreateDriverDto): Promise<Driver> {
+  async create(createDriverDto: CreateDriverDto, currentUser?: any): Promise<Driver> {
+    if (currentUser && currentUser.role !== 'admin' && currentUser._id.toString() !== createDriverDto.userId) {
+      throw new ForbiddenException('You are not authorized to register as a driver for this user');
+    }
     const existingDriver = await this.driverModel.findOne({ userId: createDriverDto.userId }).exec();
     if (existingDriver) {
       throw new BadRequestException('User is already registered as a driver');
@@ -143,7 +146,16 @@ export class DriversService {
     return driver;
   }
 
-  async updateStatus(id: string, updateDriverStatusDto: UpdateDriverStatusDto): Promise<Driver> {
+  async updateStatus(id: string, updateDriverStatusDto: UpdateDriverStatusDto, currentUser?: any): Promise<Driver> {
+    if (currentUser && currentUser.role !== 'admin') {
+      const driverObj = await this.driverModel.findById(id).exec();
+      if (!driverObj) {
+        throw new NotFoundException(`Driver with ID ${id} not found`);
+      }
+      if (driverObj.userId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to update this driver status');
+      }
+    }
     const driver = await this.driverModel.findByIdAndUpdate(
       id,
       { isAvailable: updateDriverStatusDto.isAvailable },
@@ -156,7 +168,16 @@ export class DriversService {
     return driver;
   }
 
-  async updateLocation(id: string, updateLocationDto: UpdateLocationDto): Promise<Driver> {
+  async updateLocation(id: string, updateLocationDto: UpdateLocationDto, currentUser?: any): Promise<Driver> {
+    if (currentUser && currentUser.role !== 'admin') {
+      const driverObj = await this.driverModel.findById(id).exec();
+      if (!driverObj) {
+        throw new NotFoundException(`Driver with ID ${id} not found`);
+      }
+      if (driverObj.userId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to update this driver location');
+      }
+    }
     const driver = await this.driverModel.findByIdAndUpdate(
       id,
       { 

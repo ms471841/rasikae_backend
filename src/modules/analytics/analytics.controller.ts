@@ -3,6 +3,7 @@ import { AnalyticsService } from './analytics.service';
 import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrUser } from '../auth/decorators/user.decorator';
 
 @Controller('analytics')
 export class AnalyticsController {
@@ -23,7 +24,8 @@ export class AnalyticsController {
   }
 
   @Get('restaurant/:restaurantId')
-  getRestaurantAnalytics(@Param('restaurantId') restaurantId: string) {
-    return this.analyticsService.getRestaurantDashboardStats(restaurantId);
+  @UseGuards(FirebaseAuthGuard)
+  getRestaurantAnalytics(@CurrUser() user: any, @Param('restaurantId') restaurantId: string) {
+    return this.analyticsService.getRestaurantDashboardStats(restaurantId, user);
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { MenuItem, MenuItemDocument } from './schemas/menu-item.schema';
@@ -13,7 +13,13 @@ export class MenuItemsService {
     @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
   ) {}
 
-  async create(createMenuItemDto: CreateMenuItemDto): Promise<MenuItem> {
+  async create(createMenuItemDto: CreateMenuItemDto, currentUser?: any): Promise<MenuItem> {
+    if (currentUser && currentUser.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(createMenuItemDto.restaurantId).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to create menu items for this restaurant');
+      }
+    }
     const createdMenuItem = new this.menuItemModel(createMenuItemDto);
     const savedItem = await createdMenuItem.save();
 
@@ -170,10 +176,17 @@ export class MenuItemsService {
     return menuItem;
   }
 
-  async update(id: string, updateMenuItemDto: UpdateMenuItemDto): Promise<MenuItem> {
+  async update(id: string, updateMenuItemDto: UpdateMenuItemDto, currentUser?: any): Promise<MenuItem> {
     const oldItem = await this.menuItemModel.findById(id).exec();
     if (!oldItem) {
       throw new NotFoundException(`MenuItem with ID ${id} not found`);
+    }
+
+    if (currentUser && currentUser.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(oldItem.restaurantId).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to update menu items for this restaurant');
+      }
     }
 
     const updatedMenuItem = await this.menuItemModel
@@ -229,7 +242,19 @@ export class MenuItemsService {
     return updatedMenuItem;
   }
 
-  async remove(id: string): Promise<MenuItem> {
+  async remove(id: string, currentUser?: any): Promise<MenuItem> {
+    const item = await this.menuItemModel.findById(id).exec();
+    if (!item) {
+      throw new NotFoundException(`MenuItem with ID ${id} not found`);
+    }
+
+    if (currentUser && currentUser.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(item.restaurantId).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to delete menu items for this restaurant');
+      }
+    }
+
     const deletedMenuItem = await this.menuItemModel.findByIdAndDelete(id).exec();
     if (!deletedMenuItem) {
       throw new NotFoundException(`MenuItem with ID ${id} not found`);

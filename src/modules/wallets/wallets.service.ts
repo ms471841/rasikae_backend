@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Wallet, WalletDocument } from './schemas/wallet.schema';
@@ -6,6 +6,7 @@ import { Transaction, TransactionDocument, TransactionType, TransactionStatus } 
 import { WithdrawDto } from './dto/withdraw.dto';
 import { SettingsService } from '../settings/settings.service';
 import { BankAccount, BankAccountDocument } from '../restaurants/schemas/bank-account.schema';
+import { Restaurant, RestaurantDocument } from '../restaurants/schemas/restaurant.schema';
 import { PaymentsService } from '../payments/payments.service';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class WalletsService {
     @InjectModel(Wallet.name) private walletModel: Model<WalletDocument>,
     @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
     @InjectModel(BankAccount.name) private bankAccountModel: Model<BankAccountDocument>,
+    @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
     private readonly settingsService: SettingsService,
     private readonly paymentsService: PaymentsService,
   ) {}
@@ -50,7 +52,13 @@ export class WalletsService {
     return newWallet.save();
   }
 
-  async getWalletByRestaurant(restaurantId: string): Promise<WalletDocument> {
+  async getWalletByRestaurant(restaurantId: string, currentUser?: any): Promise<WalletDocument> {
+    if (currentUser && currentUser.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(restaurantId).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to access this restaurant wallet');
+      }
+    }
     const wallet = await this.walletModel.findOne({ restaurantId: new Types.ObjectId(restaurantId) }).exec();
     if (!wallet) return this.initializeRestaurantWallet(restaurantId);
     return wallet;
@@ -66,8 +74,8 @@ export class WalletsService {
     return newWallet.save();
   }
 
-  async getTransactionsByRestaurant(restaurantId: string): Promise<Transaction[]> {
-    const wallet = await this.getWalletByRestaurant(restaurantId);
+  async getTransactionsByRestaurant(restaurantId: string, currentUser?: any): Promise<Transaction[]> {
+    const wallet = await this.getWalletByRestaurant(restaurantId, currentUser);
     return this.transactionModel.find({ walletId: wallet._id }).sort({ createdAt: -1 }).exec();
   }
 
@@ -192,9 +200,9 @@ export class WalletsService {
     await wallet.save();
   }
 
-  async requestWithdrawal(restaurantId: string, withdrawDto: WithdrawDto): Promise<WalletDocument> {
+  async requestWithdrawal(restaurantId: string, withdrawDto: WithdrawDto, currentUser?: any): Promise<WalletDocument> {
     const { amount, description } = withdrawDto;
-    const wallet = await this.getWalletByRestaurant(restaurantId);
+    const wallet = await this.getWalletByRestaurant(restaurantId, currentUser);
 
     if (wallet.availableBalance < amount) {
       throw new BadRequestException('Insufficient balance in wallet.');

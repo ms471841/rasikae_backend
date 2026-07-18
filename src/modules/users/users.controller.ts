@@ -5,7 +5,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateFcmTokenDto } from './dto/update-fcm-token.dto';
 import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { CurrUser } from '../auth/decorators/user.decorator';
-import type { DecodedIdToken } from 'firebase-admin/auth';
 import { Query, Param } from '@nestjs/common';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';

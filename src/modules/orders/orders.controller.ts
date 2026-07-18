@@ -54,8 +54,8 @@ export class OrdersController {
   }
 
   @Get('restaurant/:restaurantId')
-  findRestaurantOrders(@Param('restaurantId') restaurantId: string) {
-    return this.ordersService.getRestaurantOrders(restaurantId);
+  findRestaurantOrders(@CurrUser() user: any, @Param('restaurantId') restaurantId: string) {
+    return this.ordersService.getRestaurantOrders(restaurantId, user);
   }
 
   @Get('vendor/all')
@@ -79,8 +79,8 @@ export class OrdersController {
   }
 
   @Get(':id/invoice')
-  async getInvoice(@Param('id') id: string, @Res() res: express.Response) {
-    const order = await this.ordersService.getOrderById(id);
+  async getInvoice(@CurrUser() user: any, @Param('id') id: string, @Res() res: express.Response) {
+    const order = await this.ordersService.getOrderById(id, user);
     const pdfBuffer = await this.invoicesService.generateInvoicePdf(order);
 
     res.set({
@@ -93,18 +93,18 @@ export class OrdersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.ordersService.getOrderById(id);
+  findOne(@CurrUser() user: any, @Param('id') id: string) {
+    return this.ordersService.getOrderById(id, user);
   }
 
   @Patch(':id/status')
-  update(@Param('id') id: string, @Body() updateOrderStatusDto: UpdateOrderStatusDto) {
-    return this.ordersService.updateOrderStatus(id, updateOrderStatusDto);
+  update(@CurrUser() user: any, @Param('id') id: string, @Body() updateOrderStatusDto: UpdateOrderStatusDto) {
+    return this.ordersService.updateOrderStatus(id, updateOrderStatusDto, user);
   }
 
   @Patch(':id/assign-driver')
-  assignDriver(@Param('id') id: string, @Body() assignDriverDto: AssignDriverDto) {
-    return this.ordersService.assignDriver(id, assignDriverDto);
+  assignDriver(@CurrUser() user: any, @Param('id') id: string, @Body() assignDriverDto: AssignDriverDto) {
+    return this.ordersService.assignDriver(id, assignDriverDto, user);
   }
 
   @Patch(':id/delivered')
@@ -120,8 +120,8 @@ export class OrdersController {
   }
 
   @Post(':id/auto-assign')
-  autoAssign(@Param('id') id: string) {
-    return this.ordersService.autoAssignDriver(id);
+  autoAssign(@CurrUser() user: any, @Param('id') id: string) {
+    return this.ordersService.autoAssignDriver(id, user);
   }
 
   // ─── Online Payment Flow ────────────────────────────────────────────

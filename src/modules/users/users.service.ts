@@ -12,6 +12,8 @@ import { Cart, CartDocument } from '../carts/schemas/cart.schema';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { Vendor, VendorDocument } from '../vendors/schemas/vendor.schema';
 
+const escapeRegex = (val: string) => val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -139,7 +141,7 @@ export class UsersService {
     const query: any = {};
 
     if (search) {
-      const searchRegex = new RegExp(search, 'i');
+      const searchRegex = new RegExp(escapeRegex(search), 'i');
       query.$or = [
         { name: searchRegex },
         { email: searchRegex },
@@ -266,7 +268,7 @@ export class UsersService {
 
   async searchUsers(query: string, page: number = 1, limit: number = 10): Promise<any> {
     const skip = (page - 1) * limit;
-    const searchRegex = new RegExp(query, 'i');
+    const searchRegex = new RegExp(escapeRegex(query), 'i');
     const filter = {
       $or: [
         { name: searchRegex },

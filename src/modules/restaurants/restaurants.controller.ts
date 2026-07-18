@@ -109,30 +109,32 @@ export class RestaurantsController {
   @Patch(':id')
   @UseGuards(FirebaseAuthGuard)
   async update(
+    @CurrUser() user: any,
     @Param('id') id: string,
     @Body() updateRestaurantDto: UpdateRestaurantDto,
   ) {
-    return this.restaurantsService.update(id, updateRestaurantDto);
+    return this.restaurantsService.update(id, updateRestaurantDto, user);
   }
 
   @Get(':id/bank-account')
   @UseGuards(FirebaseAuthGuard)
-  async getBankAccount(@Param('id') id: string) {
-    return this.restaurantsService.getBankAccount(id);
+  async getBankAccount(@CurrUser() user: any, @Param('id') id: string) {
+    return this.restaurantsService.getBankAccount(id, user);
   }
 
   @Post(':id/bank-account')
   @UseGuards(FirebaseAuthGuard)
   async upsertBankAccount(
+    @CurrUser() user: any,
     @Param('id') id: string,
     @Body() bankAccountData: any,
   ) {
-    return this.restaurantsService.upsertBankAccount(id, bankAccountData);
+    return this.restaurantsService.upsertBankAccount(id, bankAccountData, user);
   }
 
   @Delete(':id')
   @UseGuards(FirebaseAuthGuard)
-  async remove(@Param('id') id: string) {
-    return this.restaurantsService.remove(id);
+  async remove(@CurrUser() user: any, @Param('id') id: string) {
+    return this.restaurantsService.remove(id, user);
   }
 }

@@ -11,11 +11,18 @@ import {
   FileTypeValidator,
   Param,
   UseGuards,
+  ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { S3Service } from '../s3/s3.service';
 import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { v4 as uuidv4 } from 'uuid';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Restaurant, RestaurantDocument } from '../restaurants/schemas/restaurant.schema';
+import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
+import { CurrUser } from '../auth/decorators/user.decorator';
 
 const IMAGE_VALIDATORS = [
   new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5 MB
@@ -24,7 +31,11 @@ const IMAGE_VALIDATORS = [
 
 @Controller('uploads')
 export class UploadsController {
-  constructor(private readonly s3Service: S3Service) {}
+  constructor(
+    private readonly s3Service: S3Service,
+    @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
+    @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
+  ) {}
 
   // ─────────────────────────────────────────────────────────────────────────
   // GENERIC endpoints (kept for backward compatibility)
@@ -77,10 +88,14 @@ export class UploadsController {
   @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadUserProfilePicture(
+    @CurrUser() user: any,
     @Param('userId') userId: string,
     @UploadedFile(new ParseFilePipe({ validators: IMAGE_VALIDATORS }))
     file: Express.Multer.File,
   ) {
+    if (user.role !== 'admin' && user._id.toString() !== userId) {
+      throw new ForbiddenException('You cannot upload a profile picture for another user');
+    }
     if (!file) throw new BadRequestException('File is required');
     const ext = file.originalname.split('.').pop();
     const s3Key = `users/${userId}/profile/avatar.${ext}`;
@@ -97,10 +112,18 @@ export class UploadsController {
   @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadRestaurantLogo(
+    @CurrUser() user: any,
     @Param('restaurantId') restaurantId: string,
     @UploadedFile(new ParseFilePipe({ validators: IMAGE_VALIDATORS }))
     file: Express.Multer.File,
   ) {
+    if (user.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(restaurantId).exec();
+      if (!restaurant) throw new NotFoundException('Restaurant not found');
+      if (restaurant.ownerId.toString() !== user._id.toString()) {
+        throw new ForbiddenException('You are not authorized to upload logo for this restaurant');
+      }
+    }
     if (!file) throw new BadRequestException('File is required');
     const ext = file.originalname.split('.').pop();
     const s3Key = `restaurants/${restaurantId}/logo.${ext}`;
@@ -118,9 +141,17 @@ export class UploadsController {
   @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FilesInterceptor('files', 5))
   async uploadRestaurantCoverImages(
+    @CurrUser() user: any,
     @Param('restaurantId') restaurantId: string,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
+    if (user.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(restaurantId).exec();
+      if (!restaurant) throw new NotFoundException('Restaurant not found');
+      if (restaurant.ownerId.toString() !== user._id.toString()) {
+        throw new ForbiddenException('You are not authorized to upload cover images for this restaurant');
+      }
+    }
     if (!files || files.length === 0)
       throw new BadRequestException('At least one file is required');
 
@@ -150,10 +181,19 @@ export class UploadsController {
   @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadMenuItemImage(
+    @CurrUser() user: any,
     @Param('menuItemId') menuItemId: string,
     @UploadedFile(new ParseFilePipe({ validators: IMAGE_VALIDATORS }))
     file: Express.Multer.File,
   ) {
+    if (user.role !== 'admin') {
+      const menuItem = await this.menuItemModel.findById(menuItemId).exec();
+      if (!menuItem) throw new NotFoundException('Menu item not found');
+      const restaurant = await this.restaurantModel.findById(menuItem.restaurantId).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== user._id.toString()) {
+        throw new ForbiddenException('You are not authorized to upload image for this menu item');
+      }
+    }
     if (!file) throw new BadRequestException('File is required');
     const ext = file.originalname.split('.').pop();
     const s3Key = `menu-items/${menuItemId}/image.${ext}`;
@@ -170,10 +210,19 @@ export class UploadsController {
   @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadMenuItemThumbnail(
+    @CurrUser() user: any,
     @Param('menuItemId') menuItemId: string,
     @UploadedFile(new ParseFilePipe({ validators: IMAGE_VALIDATORS }))
     file: Express.Multer.File,
   ) {
+    if (user.role !== 'admin') {
+      const menuItem = await this.menuItemModel.findById(menuItemId).exec();
+      if (!menuItem) throw new NotFoundException('Menu item not found');
+      const restaurant = await this.restaurantModel.findById(menuItem.restaurantId).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== user._id.toString()) {
+        throw new ForbiddenException('You are not authorized to upload thumbnail for this menu item');
+      }
+    }
     if (!file) throw new BadRequestException('File is required');
     const ext = file.originalname.split('.').pop();
     const s3Key = `menu-items/${menuItemId}/thumbnail.${ext}`;
@@ -194,10 +243,14 @@ export class UploadsController {
   @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadCategoryImage(
+    @CurrUser() user: any,
     @Param('categoryId') categoryId: string,
     @UploadedFile(new ParseFilePipe({ validators: IMAGE_VALIDATORS }))
     file: Express.Multer.File,
   ) {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException('Only admin users can upload category images');
+    }
     if (!file) throw new BadRequestException('File is required');
     const ext = file.originalname.split('.').pop();
     const s3Key = `categories/${categoryId}/image.${ext}`;
@@ -214,10 +267,14 @@ export class UploadsController {
   @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadCuisineImage(
+    @CurrUser() user: any,
     @Param('cuisineId') cuisineId: string,
     @UploadedFile(new ParseFilePipe({ validators: IMAGE_VALIDATORS }))
     file: Express.Multer.File,
   ) {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException('Only admin users can upload cuisine images');
+    }
     if (!file) throw new BadRequestException('File is required');
     const ext = file.originalname.split('.').pop();
     const s3Key = `cuisines/${cuisineId}/image.${ext}`;

@@ -1,38 +1,46 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, ForbiddenException } from '@nestjs/common';
 import { WalletsService } from './wallets.service';
 import { Body, Post, UseGuards } from '@nestjs/common';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrUser } from '../auth/decorators/user.decorator';
 
 @Controller('wallets')
+@UseGuards(FirebaseAuthGuard)
 export class WalletsController {
   constructor(private readonly walletsService: WalletsService) {}
 
   @Get('driver/:userId')
-  getWallet(@Param('userId') userId: string) {
+  getWallet(@CurrUser() user: any, @Param('userId') userId: string) {
+    if (user.role !== 'admin' && user._id.toString() !== userId) {
+      throw new ForbiddenException('You are not authorized to access this driver wallet');
+    }
     return this.walletsService.getWalletByUser(userId);
   }
 
   @Get('driver/:userId/transactions')
-  getTransactions(@Param('userId') userId: string) {
+  getTransactions(@CurrUser() user: any, @Param('userId') userId: string) {
+    if (user.role !== 'admin' && user._id.toString() !== userId) {
+      throw new ForbiddenException('You are not authorized to access these transactions');
+    }
     return this.walletsService.getTransactionsByUser(userId);
   }
 
   @Get('restaurant/:restaurantId')
-  getRestaurantWallet(@Param('restaurantId') restaurantId: string) {
-    return this.walletsService.getWalletByRestaurant(restaurantId);
+  getRestaurantWallet(@CurrUser() user: any, @Param('restaurantId') restaurantId: string) {
+    return this.walletsService.getWalletByRestaurant(restaurantId, user);
   }
 
   @Get('restaurant/:restaurantId/transactions')
-  getRestaurantTransactions(@Param('restaurantId') restaurantId: string) {
-    return this.walletsService.getTransactionsByRestaurant(restaurantId);
+  getRestaurantTransactions(@CurrUser() user: any, @Param('restaurantId') restaurantId: string) {
+    return this.walletsService.getTransactionsByRestaurant(restaurantId, user);
   }
 
   @Post('restaurant/:restaurantId/withdraw')
-  requestWithdraw(@Param('restaurantId') restaurantId: string, @Body() withdrawDto: WithdrawDto) {
-    return this.walletsService.requestWithdrawal(restaurantId, withdrawDto);
+  requestWithdraw(@CurrUser() user: any, @Param('restaurantId') restaurantId: string, @Body() withdrawDto: WithdrawDto) {
+    return this.walletsService.requestWithdrawal(restaurantId, withdrawDto, user);
   }
 
   @Get('admin/auditor')

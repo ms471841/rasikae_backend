@@ -7,15 +7,17 @@ import { UpdateLocationDto } from './dto/update-location.dto';
 import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrUser } from '../auth/decorators/user.decorator';
 
 @Controller('drivers')
 export class DriversController {
   constructor(private readonly driversService: DriversService) {}
 
   @Post()
+  @UseGuards(FirebaseAuthGuard)
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() createDriverDto: CreateDriverDto) {
-    return this.driversService.create(createDriverDto);
+  create(@CurrUser() user: any, @Body() createDriverDto: CreateDriverDto) {
+    return this.driversService.create(createDriverDto, user);
   }
 
   @Post('onboard')
@@ -27,6 +29,8 @@ export class DriversController {
   }
 
   @Get()
+  @UseGuards(FirebaseAuthGuard, RolesGuard)
+  @Roles('admin')
   findAll() {
     return this.driversService.findAll();
   }
@@ -39,11 +43,13 @@ export class DriversController {
   }
 
   @Get('available')
+  @UseGuards(FirebaseAuthGuard)
   findAvailable() {
     return this.driversService.findAvailable();
   }
 
   @Get('nearby')
+  @UseGuards(FirebaseAuthGuard)
   findNearbyAvailable(
     @Query('lng') lng: string, 
     @Query('lat') lat: string, 
@@ -55,17 +61,28 @@ export class DriversController {
   }
 
   @Get(':id')
+  @UseGuards(FirebaseAuthGuard)
   findOne(@Param('id') id: string) {
     return this.driversService.findOne(id);
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() updateDriverStatusDto: UpdateDriverStatusDto) {
-    return this.driversService.updateStatus(id, updateDriverStatusDto);
+  @UseGuards(FirebaseAuthGuard)
+  updateStatus(
+    @CurrUser() user: any,
+    @Param('id') id: string,
+    @Body() updateDriverStatusDto: UpdateDriverStatusDto
+  ) {
+    return this.driversService.updateStatus(id, updateDriverStatusDto, user);
   }
 
   @Patch(':id/location')
-  updateLocation(@Param('id') id: string, @Body() updateLocationDto: UpdateLocationDto) {
-    return this.driversService.updateLocation(id, updateLocationDto);
+  @UseGuards(FirebaseAuthGuard)
+  updateLocation(
+    @CurrUser() user: any,
+    @Param('id') id: string,
+    @Body() updateLocationDto: UpdateLocationDto
+  ) {
+    return this.driversService.updateLocation(id, updateLocationDto, user);
   }
 }

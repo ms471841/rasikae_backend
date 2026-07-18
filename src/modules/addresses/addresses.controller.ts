@@ -1,41 +1,64 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpCode, HttpStatus, UseGuards, ForbiddenException } from '@nestjs/common';
 import { AddressesService } from './addresses.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
+import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
+import { CurrUser } from '../auth/decorators/user.decorator';
 
 @Controller('addresses')
+@UseGuards(FirebaseAuthGuard)
 export class AddressesController {
   constructor(private readonly addressesService: AddressesService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() createAddressDto: CreateAddressDto) {
+  create(@CurrUser() user: any, @Body() createAddressDto: CreateAddressDto) {
+    if (user.role !== 'admin' && user._id.toString() !== createAddressDto.userId) {
+      throw new ForbiddenException('You cannot create an address for another user');
+    }
     return this.addressesService.create(createAddressDto);
   }
 
   // Expecting a query parameter `?userId=...` because users request their own addresses
   @Get()
-  findAllByUser(@Query('userId') userId: string) {
+  findAllByUser(@CurrUser() user: any, @Query('userId') userId: string) {
+    if (user.role !== 'admin' && user._id.toString() !== userId) {
+      throw new ForbiddenException('You cannot access addresses of another user');
+    }
     return this.addressesService.findAllByUser(userId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Query('userId') userId: string) {
+  findOne(@CurrUser() user: any, @Param('id') id: string, @Query('userId') userId: string) {
+    if (user.role !== 'admin' && user._id.toString() !== userId) {
+      throw new ForbiddenException('You cannot access addresses of another user');
+    }
     return this.addressesService.findOne(id, userId);
   }
 
   @Patch(':id')
   update(
+    @CurrUser() user: any,
     @Param('id') id: string,
     @Query('userId') userId: string,
     @Body() updateAddressDto: UpdateAddressDto
   ) {
+    if (user.role !== 'admin' && user._id.toString() !== userId) {
+      throw new ForbiddenException('You cannot modify addresses of another user');
+    }
     return this.addressesService.update(id, userId, updateAddressDto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string, @Query('userId') userId: string) {
+  remove(
+    @CurrUser() user: any,
+    @Param('id') id: string,
+    @Query('userId') userId: string
+  ) {
+    if (user.role !== 'admin' && user._id.toString() !== userId) {
+      throw new ForbiddenException('You cannot delete addresses of another user');
+    }
     return this.addressesService.remove(id, userId);
   }
 }

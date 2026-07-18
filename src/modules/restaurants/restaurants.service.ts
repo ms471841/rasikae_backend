@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import { Restaurant, RestaurantDocument } from './schemas/restaurant.schema';
@@ -173,7 +173,13 @@ export class RestaurantsService {
     return restaurant;
   }
 
-  async update(id: string, updateRestaurantDto: UpdateRestaurantDto): Promise<Restaurant> {
+  async update(id: string, updateRestaurantDto: UpdateRestaurantDto, currentUser?: any): Promise<Restaurant> {
+    if (currentUser && currentUser.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(id).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to manage this restaurant');
+      }
+    }
     const existingRestaurant = await this.restaurantModel
       .findByIdAndUpdate(id, updateRestaurantDto, { returnDocument: 'after' })
       .exec();
@@ -185,7 +191,13 @@ export class RestaurantsService {
     return existingRestaurant;
   }
 
-  async remove(id: string): Promise<Restaurant> {
+  async remove(id: string, currentUser?: any): Promise<Restaurant> {
+    if (currentUser && currentUser.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(id).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to manage this restaurant');
+      }
+    }
     const deletedRestaurant = await this.restaurantModel.findByIdAndDelete(id).exec();
     
     if (!deletedRestaurant) {
@@ -195,7 +207,13 @@ export class RestaurantsService {
     return deletedRestaurant;
   }
 
-  async getBankAccount(restaurantId: string): Promise<BankAccount> {
+  async getBankAccount(restaurantId: string, currentUser?: any): Promise<BankAccount> {
+    if (currentUser && currentUser.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(restaurantId).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to access this restaurant bank account');
+      }
+    }
     const bankAccount = await this.bankAccountModel.findOne({ restaurantId: new mongoose.Types.ObjectId(restaurantId) }).exec();
     if (!bankAccount) {
       throw new NotFoundException(`Bank account for restaurant ${restaurantId} not found`);
@@ -203,8 +221,13 @@ export class RestaurantsService {
     return bankAccount;
   }
 
-  async upsertBankAccount(restaurantId: string, data: any): Promise<BankAccount> {
-    // Check if restaurant exists and belongs to user if needed (handled in controller via guards usually, but we assume valid restaurantId here)
+  async upsertBankAccount(restaurantId: string, data: any, currentUser?: any): Promise<BankAccount> {
+    if (currentUser && currentUser.role !== 'admin') {
+      const restaurant = await this.restaurantModel.findById(restaurantId).exec();
+      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
+        throw new ForbiddenException('You are not authorized to manage this restaurant bank account');
+      }
+    }
     const existing = await this.bankAccountModel.findOne({ restaurantId: new mongoose.Types.ObjectId(restaurantId) }).exec();
     if (existing) {
       Object.assign(existing, data);

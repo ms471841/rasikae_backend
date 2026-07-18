@@ -1,16 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
 import { MenuItemsService } from './menu-items.service';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
+import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
+import { CurrUser } from '../auth/decorators/user.decorator';
 
 @Controller('menu-items')
 export class MenuItemsController {
   constructor(private readonly menuItemsService: MenuItemsService) {}
 
   @Post()
+  @UseGuards(FirebaseAuthGuard)
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() createMenuItemDto: CreateMenuItemDto) {
-    return this.menuItemsService.create(createMenuItemDto);
+  create(@CurrUser() user: any, @Body() createMenuItemDto: CreateMenuItemDto) {
+    return this.menuItemsService.create(createMenuItemDto, user);
   }
 
   @Get()
@@ -61,13 +64,15 @@ export class MenuItemsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateMenuItemDto: UpdateMenuItemDto) {
-    return this.menuItemsService.update(id, updateMenuItemDto);
+  @UseGuards(FirebaseAuthGuard)
+  update(@CurrUser() user: any, @Param('id') id: string, @Body() updateMenuItemDto: UpdateMenuItemDto) {
+    return this.menuItemsService.update(id, updateMenuItemDto, user);
   }
 
   @Delete(':id')
+  @UseGuards(FirebaseAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string) {
-    return this.menuItemsService.remove(id);
+  remove(@CurrUser() user: any, @Param('id') id: string) {
+    return this.menuItemsService.remove(id, user);
   }
 }

@@ -6,6 +6,7 @@ import { Wallet, WalletSchema } from './schemas/wallet.schema';
 import { Transaction, TransactionSchema } from './schemas/transaction.schema';
 import { SettingsModule } from '../settings/settings.module';
 import { BankAccount, BankAccountSchema } from '../restaurants/schemas/bank-account.schema';
+import { Restaurant, RestaurantSchema } from '../restaurants/schemas/restaurant.schema';
 import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
@@ -14,6 +15,7 @@ import { PaymentsModule } from '../payments/payments.module';
       { name: Wallet.name, schema: WalletSchema },
       { name: Transaction.name, schema: TransactionSchema },
       { name: BankAccount.name, schema: BankAccountSchema },
+      { name: Restaurant.name, schema: RestaurantSchema },
     ]),
     SettingsModule,
     PaymentsModule,
