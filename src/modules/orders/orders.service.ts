@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Model, Types, Connection, ClientSession } from 'mongoose';
 import { Order, OrderDocument, OrderStatus, OrderItem } from './schemas/order.schema';
 import { CheckoutDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -26,6 +26,7 @@ export class OrdersService {
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
     @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
     @InjectModel(PaymentTransaction.name) private transactionModel: Model<PaymentTransactionDocument>,
+    @InjectConnection() private readonly connection: Connection,
     private readonly cartsService: CartsService,
     private readonly driversService: DriversService,
     private readonly walletsService: WalletsService,
@@ -36,6 +37,26 @@ export class OrdersService {
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
   ) {}
+
+  private async runInTransaction<T>(work: (session?: ClientSession) => Promise<T>): Promise<T> {
+    const session = await this.connection.startSession();
+    try {
+      session.startTransaction();
+      const result = await work(session);
+      await session.commitTransaction();
+      return result;
+    } catch (error: any) {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
+      if (error?.message?.includes('Transaction numbers are only allowed') || error?.code === 20) {
+        return await work(undefined);
+      }
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
 
   private extractId(id: any): string {
     if (!id) return '';
@@ -706,77 +727,82 @@ export class OrdersService {
       (deliveredAt.getTime() - (order.createdAt as any).getTime()) / 60000
     );
 
-    order.status = OrderStatus.DELIVERED;
-    order.deliveredAt = deliveredAt;
-    order.actualDeliveryTimeMinutes = durationMinutes;
-    if (order.paymentMethod === 'COD') {
-      order.paymentStatus = 'PAID';
-    }
-    await order.save();
+    // Perform all database balance allocations and status updates atomically
+    await this.runInTransaction(async (session) => {
+      order.status = OrderStatus.DELIVERED;
+      order.deliveredAt = deliveredAt;
+      order.actualDeliveryTimeMinutes = durationMinutes;
+      if (order.paymentMethod === 'COD') {
+        order.paymentStatus = 'PAID';
+      }
+      await order.save(session ? { session } : undefined);
 
-    // Update restaurant's rolling delivery time average
-    if (durationMinutes > 0 && durationMinutes < 180) { // Ignore outliers > 3 hours
-      await this.restaurantModel.findByIdAndUpdate(
-        order.restaurantId,
-        {
-          $inc: {
-            totalDeliveryTimeMinutes: durationMinutes,
-            deliveryCount: 1,
-          },
-        },
-      ).exec();
-
-      // Recompute and save the deliveryTime on the restaurant
-      const restaurant = await this.restaurantModel.findById(order.restaurantId).exec();
-      if (restaurant && restaurant.deliveryCount && restaurant.deliveryCount > 0) {
-        const avgMinutes = Math.round(
-          (restaurant.totalDeliveryTimeMinutes ?? 0) / restaurant.deliveryCount
-        );
+      // Update restaurant's rolling delivery time average
+      if (durationMinutes > 0 && durationMinutes < 180) {
         await this.restaurantModel.findByIdAndUpdate(
           order.restaurantId,
-          { deliveryTime: avgMinutes }
+          {
+            $inc: {
+              totalDeliveryTimeMinutes: durationMinutes,
+              deliveryCount: 1,
+            },
+          },
+          session ? { session } : undefined
         ).exec();
+
+        const rq = this.restaurantModel.findById(order.restaurantId);
+        if (session) rq.session(session);
+        const restaurant = await rq.exec();
+        if (restaurant && restaurant.deliveryCount && restaurant.deliveryCount > 0) {
+          const avgMinutes = Math.round(
+            (restaurant.totalDeliveryTimeMinutes ?? 0) / restaurant.deliveryCount
+          );
+          await this.restaurantModel.findByIdAndUpdate(
+            order.restaurantId,
+            { deliveryTime: avgMinutes },
+            session ? { session } : undefined
+          ).exec();
+        }
       }
-    }
 
-    // Trigger phase 2 earning mechanisms securely!
-    if (order.driverId || driverId) {
-      await this.walletsService.processDeliveryEarnings(
-        driverId || order.driverId!.toString(), 
-        id, 
-        order.deliveryFee || 0,
-        order.totalAmount,
-        order.paymentMethod
+      // Trigger driver earnings securely
+      if (order.driverId || driverId) {
+        await this.walletsService.processDeliveryEarnings(
+          driverId || order.driverId!.toString(), 
+          id, 
+          order.deliveryFee || 0,
+          order.totalAmount,
+          order.paymentMethod,
+          session
+        );
+      }
+
+      // Trigger platform commission and restaurant earnings securely
+      await this.walletsService.processRestaurantEarnings(
+        order.restaurantId.toString(),
+        id,
+        order.subTotal,
+        order.tax || 0,
+        order.cgst || 0,
+        order.sgst || 0,
+        session
       );
-    }
 
-    // Trigger Admin/Platform commission and Restaurant Earnings
-    await this.walletsService.processRestaurantEarnings(
-      order.restaurantId.toString(),
-      id,
-      order.subTotal,
-      order.tax || 0,
-      order.cgst || 0,
-      order.sgst || 0
-    );
+      // Update User Stats (Denormalization)
+      await this.usersService.incrementUserStats(this.extractId(order.userId), order.totalAmount);
+    });
 
-    // Notify Customer about Delivery
+    // Notify Customer about Delivery (after atomic DB commit)
     await this.notificationsService.sendToUser(this.extractId(order.userId), {
-
       title: 'Order Delivered! 🍕',
       body: 'Your Rasikae treat has been delivered. Enjoy your meal!',
       data: { orderId: id, status: 'DELIVERED' }
     });
 
-    // Update User Stats (Denormalization)
-    await this.usersService.incrementUserStats(this.extractId(order.userId), order.totalAmount);
-
-
     // Live Socket Sync
     this.socketsGateway.emitOrderStatus(id, OrderStatus.DELIVERED, order);
 
     return order;
-
   }
 
   async autoAssignDriver(id: string, maxDistanceOrUser: number | any = 10000, currentUser?: any): Promise<{ order: Order, driverId?: string, message: string }> {
