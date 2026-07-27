@@ -11,11 +11,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     cors: {
       origin: [
+        'https://rasikae-admin.vercel.app',// Admin Panel
         'http://localhost:5173', // Admin Panel
         'http://localhost:5174', // Vendor/Driver Panel (if on 5174)
         'http://localhost:3000', // Backend itself
         'https://rasikae.com',
-        'https://rasikaebackend-production.up.railway.app',
+      
         /\.rasikae\.com$/,       // Any subdomain of rasikae.com
       ],
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
