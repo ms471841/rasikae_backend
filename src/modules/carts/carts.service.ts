@@ -1,16 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Cart, CartDocument } from './schemas/cart.schema';
 import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
+import { SocketsGateway } from '../sockets/sockets.gateway';
 
 @Injectable()
 export class CartsService {
   constructor(
     @InjectModel(Cart.name) private cartModel: Model<CartDocument>,
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
+    @Inject(forwardRef(() => SocketsGateway))
+    private readonly socketsGateway: SocketsGateway,
   ) {}
 
   private calculateCartTotal(cart: CartDocument): number {
@@ -143,7 +146,9 @@ export class CartsService {
 
     cart.totalPrice = this.calculateCartTotal(cart);
     await cart.save();
-    return this.getPopulatedCart(userId);
+    const updatedCart = await this.getPopulatedCart(userId);
+    this.socketsGateway.emitCartUpdated(userId, updatedCart);
+    return updatedCart;
   }
 
   private async getPopulatedCart(userId: string): Promise<CartDocument> {
@@ -184,7 +189,9 @@ export class CartsService {
 
     cart.totalPrice = this.calculateCartTotal(cart);
     await cart.save();
-    return this.getPopulatedCart(userId);
+    const updatedCart = await this.getPopulatedCart(userId);
+    this.socketsGateway.emitCartUpdated(userId, updatedCart);
+    return updatedCart;
   }
 
   async removeItem(userId: string, itemId: string): Promise<Cart> {
@@ -196,10 +203,13 @@ export class CartsService {
     cart.items = cart.items.filter(i => i._id.toString() !== itemId);
     cart.totalPrice = this.calculateCartTotal(cart);
     await cart.save();
-    return this.getPopulatedCart(userId);
+    const updatedCart = await this.getPopulatedCart(userId);
+    this.socketsGateway.emitCartUpdated(userId, updatedCart);
+    return updatedCart;
   }
 
   async clearCart(userId: string): Promise<void> {
     await this.cartModel.findOneAndDelete({ userId }).exec();
+    this.socketsGateway.emitCartUpdated(userId, { userId, items: [], totalPrice: 0 });
   }
 }

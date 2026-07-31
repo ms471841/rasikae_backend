@@ -6,6 +6,7 @@ import { Cart, CartSchema } from './schemas/cart.schema';
 import { MenuItem, MenuItemSchema } from '../menu-items/schemas/menu-item.schema';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
+import { SocketsModule } from '../sockets/sockets.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { UsersModule } from '../users/users.module';
     ]),
     AuthModule,
     forwardRef(() => UsersModule),
+    forwardRef(() => SocketsModule),
   ],
   controllers: [CartsController],
   providers: [CartsService],

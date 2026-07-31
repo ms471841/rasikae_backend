@@ -92,6 +92,22 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     return { event: 'joinedRoom', data: `Joined admin stream` };
   }
 
+  @SubscribeMessage('joinUserRoom')
+  handleJoinUserRoom(
+    @MessageBody() data: { userId?: string; firebaseUid?: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    if (data?.userId) {
+      client.join(`user_${data.userId}`);
+      console.log(`Client ${client.id} joined user room: user_${data.userId}`);
+    }
+    if (data?.firebaseUid) {
+      client.join(`user_${data.firebaseUid}`);
+      console.log(`Client ${client.id} joined user room: user_${data.firebaseUid}`);
+    }
+    return { event: 'joinedRoom', data: `Joined user room` };
+  }
+
   @SubscribeMessage('updateLocation')
   async handleUpdateLocation(
     @MessageBody() data: { orderId: string; lat: number; lng: number },
@@ -213,5 +229,19 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
       order,
       timestamp: new Date().toISOString(),
     });
+  }
+
+  emitCartUpdated(userId: string, cart: any, firebaseUid?: string) {
+    const serializedCart = cart ? JSON.parse(JSON.stringify(cart)) : null;
+    const payload = {
+      cart: serializedCart,
+      timestamp: new Date().toISOString(),
+    };
+    if (userId) {
+      this.server.to(`user_${userId}`).emit('cartUpdated', payload);
+    }
+    if (firebaseUid && firebaseUid !== userId) {
+      this.server.to(`user_${firebaseUid}`).emit('cartUpdated', payload);
+    }
   }
 }

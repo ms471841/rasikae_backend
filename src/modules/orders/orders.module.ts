@@ -24,7 +24,7 @@ import { forwardRef } from '@nestjs/common';
       { name: Restaurant.name, schema: RestaurantSchema },
       { name: PaymentTransaction.name, schema: PaymentTransactionSchema },
     ]),
-    CartsModule,
+    forwardRef(() => CartsModule),
     DriversModule,
     WalletsModule,
     forwardRef(() => SocketsModule),

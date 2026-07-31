@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection, ClientSession } from 'mongoose';
@@ -27,9 +27,11 @@ export class OrdersService {
     @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
     @InjectModel(PaymentTransaction.name) private transactionModel: Model<PaymentTransactionDocument>,
     @InjectConnection() private readonly connection: Connection,
+    @Inject(forwardRef(() => CartsService))
     private readonly cartsService: CartsService,
     private readonly driversService: DriversService,
     private readonly walletsService: WalletsService,
+    @Inject(forwardRef(() => SocketsGateway))
     private readonly socketsGateway: SocketsGateway,
     private readonly paymentsService: PaymentsService,
     private readonly notificationsService: NotificationsService,
