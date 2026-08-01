@@ -16,9 +16,18 @@ export class DriversService {
   constructor(
     @InjectModel(Driver.name) private driverModel: Model<DriverDocument>,
     @Inject(FIREBASE_APP) private firebaseApp: admin.app.App,
-    private readonly walletsService: WalletsService,
     private readonly usersService: UsersService,
+    private readonly walletsService: WalletsService,
   ) {}
+
+  async checkDriverExistsByPhone(phone: string): Promise<boolean> {
+    const user = await this.usersService.findByPhone(phone);
+    if (!user || user.role !== 'driver') {
+      return false;
+    }
+    const driver = await this.driverModel.findOne({ userId: user._id }).exec();
+    return !!driver;
+  }
 
   async create(createDriverDto: CreateDriverDto, currentUser?: any): Promise<Driver> {
     if (currentUser && currentUser.role !== 'admin' && currentUser._id.toString() !== createDriverDto.userId) {

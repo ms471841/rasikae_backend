@@ -54,6 +54,19 @@ export class UsersService {
     return user;
   }
 
+  async findByPhone(phone: string): Promise<UserDocument | null> {
+    const cleanPhone = phone.trim();
+    const digitsOnly = cleanPhone.replace(/\D/g, '');
+    const last10Digits = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+
+    return this.userModel.findOne({
+      $or: [
+        { phone: cleanPhone },
+        { phone: new RegExp(last10Digits, 'i') },
+      ]
+    }).exec();
+  }
+
   async updateProfile(firebaseUid: string, dto: UpdateUserDto): Promise<User> {
     const user = await this.userModel.findOneAndUpdate(
       { firebaseUid },

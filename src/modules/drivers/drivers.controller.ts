@@ -12,6 +12,15 @@ import { CurrUser } from '../auth/decorators/user.decorator';
 @Controller('drivers')
 export class DriversController {
   constructor(private readonly driversService: DriversService) {}
+  @Get('check-phone')
+  @HttpCode(HttpStatus.OK)
+  async checkDriverPhone(@Query('phone') phone: string) {
+    if (!phone) {
+      return { exists: false };
+    }
+    const exists = await this.driversService.checkDriverExistsByPhone(phone);
+    return { exists };
+  }
 
   @Post()
   @UseGuards(FirebaseAuthGuard)
