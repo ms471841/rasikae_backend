@@ -44,7 +44,13 @@ export class Address {
   location: Location;
 
   @Prop()
-  deliveryInstructions?: string;
+  additionalDetails?: string;
+
+  @Prop()
+  receiverName?: string;
+
+  @Prop()
+  receiverPhone?: string;
 
   @Prop({ default: false })
   isDefault: boolean;

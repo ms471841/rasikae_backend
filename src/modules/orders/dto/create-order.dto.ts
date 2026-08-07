@@ -18,6 +18,14 @@ class AddressDto {
   @IsOptional()
   postalCode?: string;
 
+  @IsString()
+  @IsOptional()
+  receiverName?: string;
+
+  @IsString()
+  @IsOptional()
+  receiverPhone?: string;
+
   @IsOptional()
   @IsObject()
   geo?: { lat: number; lng: number };

@@ -41,7 +41,20 @@ export class RestaurantsService {
     limit: number = 10,
     lat?: number,
     lng?: number,
-    filters: { search?: string; status?: string; isPublished?: boolean; minRating?: number; maxDistance?: number; isVeg?: boolean; cuisines?: string[]; categoryId?: string } = {}
+    filters: {
+      search?: string;
+      status?: string;
+      isPublished?: boolean;
+      minRating?: number;
+      maxDistance?: number;
+      isVeg?: boolean;
+      cuisines?: string[];
+      categoryId?: string;
+      sortBy?: string;
+      nearAndFast?: boolean;
+      hasOffers?: boolean;
+      maxPrice?: number;
+    } = {}
   ): Promise<any> {
     const skip = (page - 1) * limit;
     const baseMatch: any = {};
@@ -54,25 +67,51 @@ export class RestaurantsService {
     if (filters.isPublished !== undefined) baseMatch.isPublished = filters.isPublished;
     if (filters.minRating) baseMatch.rating = { $gte: filters.minRating };
     if (filters.isVeg === true) baseMatch.isVeg = true;
-    if (filters.cuisines && filters.cuisines.length > 0) {
-      baseMatch.cuisines = { $in: filters.cuisines.map(id => new mongoose.Types.ObjectId(id)) };
+    if (filters.nearAndFast) {
+      baseMatch.$or = [
+        ...(baseMatch.$or || []),
+        { deliveryTime: { $lte: 35 } }
+      ];
     }
-    if (filters.categoryId) {
+    if (filters.hasOffers) {
+      baseMatch.isFreeDelivery = true;
+    }
+    if (filters.cuisines && filters.cuisines.length > 0) {
+      const validObjectIds = filters.cuisines
+        .filter(c => mongoose.Types.ObjectId.isValid(c))
+        .map(c => new mongoose.Types.ObjectId(c));
+      if (validObjectIds.length > 0) {
+        baseMatch.cuisines = { $in: validObjectIds };
+      }
+    }
+    if (filters.categoryId && mongoose.Types.ObjectId.isValid(filters.categoryId)) {
       baseMatch.categories = new mongoose.Types.ObjectId(filters.categoryId);
+    }
+
+    // Determine sort stage
+    let sortStage: any = { rating: -1 };
+    if (filters.sortBy === 'Rating') {
+      sortStage = { rating: -1 };
+    } else if (filters.sortBy === 'Time') {
+      sortStage = { deliveryTime: 1 };
+    } else if (filters.sortBy === 'Distance') {
+      sortStage = { 'dist.calculated': 1 };
     }
 
     let data = [];
     if (lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng)) {
+      const effectiveMaxDistance = filters.nearAndFast ? 5000 : (filters.maxDistance || 1000000) * 1000;
       data = await this.restaurantModel.aggregate([
         {
           $geoNear: {
             near: { type: 'Point', coordinates: [lng, lat] },
             distanceField: 'dist.calculated',
-            maxDistance: (filters.maxDistance || 1000000) * 1000, // Large default for development
+            maxDistance: effectiveMaxDistance,
             query: baseMatch,
             spherical: true
           }
         },
+        { $sort: sortStage },
         { $skip: skip },
         { $limit: limit },
         { $lookup: { from: 'categories', localField: 'categories', foreignField: '_id', as: 'categories' } },
@@ -81,6 +120,7 @@ export class RestaurantsService {
     } else {
       data = await this.restaurantModel
         .find(baseMatch)
+        .sort(sortStage)
         .populate('categories cuisines')
         .skip(skip)
         .limit(limit)
@@ -103,17 +143,38 @@ export class RestaurantsService {
     lat?: number,
     lng?: number,
     limit: number = 10,
-    filters: { minRating?: number; maxDistance?: number; isVeg?: boolean; cuisines?: string[]; categoryId?: string } = {}
+    filters: {
+      minRating?: number;
+      maxDistance?: number;
+      isVeg?: boolean;
+      cuisines?: string[];
+      categoryId?: string;
+      sortBy?: string;
+      nearAndFast?: boolean;
+      hasOffers?: boolean;
+      maxPrice?: number;
+    } = {}
   ): Promise<any> {
     const baseMatch: any = { status: 'approved', isPublished: true };
     
     // Global filters for carousels
     if (filters.minRating) baseMatch.rating = { $gte: filters.minRating };
     if (filters.isVeg === true) baseMatch.isVeg = true;
-    if (filters.cuisines && filters.cuisines.length > 0) {
-      baseMatch.cuisines = { $in: filters.cuisines.map(id => new mongoose.Types.ObjectId(id)) };
+    if (filters.nearAndFast) {
+      baseMatch.deliveryTime = { $lte: 35 };
     }
-    if (filters.categoryId) {
+    if (filters.hasOffers) {
+      baseMatch.isFreeDelivery = true;
+    }
+    if (filters.cuisines && filters.cuisines.length > 0) {
+      const validObjectIds = filters.cuisines
+        .filter(c => mongoose.Types.ObjectId.isValid(c))
+        .map(c => new mongoose.Types.ObjectId(c));
+      if (validObjectIds.length > 0) {
+        baseMatch.cuisines = { $in: validObjectIds };
+      }
+    }
+    if (filters.categoryId && mongoose.Types.ObjectId.isValid(filters.categoryId)) {
       baseMatch.categories = new mongoose.Types.ObjectId(filters.categoryId);
     }
 

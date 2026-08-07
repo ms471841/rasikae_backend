@@ -27,6 +27,12 @@ export class Address {
   @Prop({ required: false })
   postalCode?: string;
 
+  @Prop({ required: false })
+  receiverName?: string;
+
+  @Prop({ required: false })
+  receiverPhone?: string;
+
   @Prop({ type: { lat: Number, lng: Number }, _id: false })
   geo?: { lat: number; lng: number };
 }
@@ -91,7 +97,6 @@ export class Order {
   restaurantId: mongoose.Types.ObjectId;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Driver', required: false })
-
   driverId?: mongoose.Types.ObjectId;
 
   @Prop({ type: [OrderItemSchema], required: true })

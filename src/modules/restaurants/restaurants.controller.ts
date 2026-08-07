@@ -43,6 +43,10 @@ export class RestaurantsController {
     @Query('isVeg') isVeg?: string,
     @Query('cuisines') cuisines?: string,
     @Query('categoryId') categoryId?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('nearAndFast') nearAndFast?: string,
+    @Query('hasOffers') hasOffers?: string,
+    @Query('maxPrice') maxPrice?: string,
   ) {
     const parsedLat = lat ? parseFloat(lat) : undefined;
     const parsedLng = lng ? parseFloat(lng) : undefined;
@@ -54,6 +58,10 @@ export class RestaurantsController {
       isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
       cuisines: cuisines ? cuisines.split(',') : undefined,
       categoryId: categoryId,
+      sortBy: sortBy,
+      nearAndFast: nearAndFast === 'true',
+      hasOffers: hasOffers === 'true',
+      maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
     };
     
     return this.restaurantsService.getHomeFeed(parsedLat, parsedLng, parsedLimit, filters);
@@ -73,6 +81,10 @@ export class RestaurantsController {
     @Query('status') status?: string,
     @Query('isPublished') isPublished?: string,
     @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('nearAndFast') nearAndFast?: string,
+    @Query('hasOffers') hasOffers?: string,
+    @Query('maxPrice') maxPrice?: string,
   ) {
     const parsedPage = page ? parseInt(page, 10) : 1;
     const parsedLimit = limit ? parseInt(limit, 10) : 10;
@@ -88,6 +100,10 @@ export class RestaurantsController {
       status: status,
       isPublished: isPublished === 'true' ? true : isPublished === 'false' ? false : undefined,
       search: search,
+      sortBy: sortBy,
+      nearAndFast: nearAndFast === 'true',
+      hasOffers: hasOffers === 'true',
+      maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
     };
 
     return this.restaurantsService.findAll(parsedPage, parsedLimit, parsedLat, parsedLng, filters);

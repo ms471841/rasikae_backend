@@ -45,7 +45,15 @@ export class CreateAddressDto {
 
   @IsString()
   @IsOptional()
-  deliveryInstructions?: string;
+  additionalDetails?: string;
+
+  @IsString()
+  @IsOptional()
+  receiverName?: string;
+
+  @IsString()
+  @IsOptional()
+  receiverPhone?: string;
 
   @IsBoolean()
   @IsOptional()
