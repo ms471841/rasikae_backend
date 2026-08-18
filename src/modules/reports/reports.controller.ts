@@ -5,12 +5,26 @@ import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
+/**
+ * ============================================================================
+ * REPORTS & CSV EXPORTS CONTROLLER
+ * Handles Exporting Reports for Orders, Financial Transactions & System Users
+ * ============================================================================
+ */
 @Controller('reports')
 @UseGuards(FirebaseAuthGuard, RolesGuard)
 @Roles('admin')
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
+  // --------------------------------------------------------------------------
+  // 👑 ADMIN PANEL APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * [👑 ADMIN PANEL] Export Orders CSV Report
+   * GET /reports/orders?start=...&end=...
+   */
   @Get('orders')
   async exportOrders(
     @Query('start') start: string,
@@ -27,6 +41,10 @@ export class ReportsController {
     res.status(200).send(csv);
   }
 
+  /**
+   * [👑 ADMIN PANEL] Export Transactions & Payouts CSV Report
+   * GET /reports/transactions?start=...&end=...
+   */
   @Get('transactions')
   async exportTransactions(
     @Query('start') start: string,
@@ -43,6 +61,10 @@ export class ReportsController {
     res.status(200).send(csv);
   }
 
+  /**
+   * [👑 ADMIN PANEL] Export Users Directory CSV Report
+   * GET /reports/users
+   */
   @Get('users')
   async exportUsers(@Res() res: express.Response) {
     const csv = await this.reportsService.generateUsersCsv();

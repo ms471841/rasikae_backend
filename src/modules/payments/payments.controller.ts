@@ -1,11 +1,24 @@
 import { Controller, Post, Body, Headers, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
-import { TransactionType } from './schemas/transaction.schema';
 
+/**
+ * ============================================================================
+ * PAYMENTS CONTROLLER
+ * Handles Razorpay Payment Verification & Gateway Webhooks
+ * ============================================================================
+ */
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  // --------------------------------------------------------------------------
+  // 📱 USER APP APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * [📱 USER APP] Verify online payment signature from Razorpay SDK
+   * POST /payments/verify
+   */
   @Post('verify')
   @HttpCode(HttpStatus.OK)
   async verifyPayment(
@@ -33,6 +46,14 @@ export class PaymentsController {
     );
   }
 
+  // --------------------------------------------------------------------------
+  // 🌐 PAYMENT GATEWAY WEBHOOK APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * [🌐 WEBHOOK] Razorpay automated payment status callback webhook
+   * POST /payments/webhook
+   */
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(

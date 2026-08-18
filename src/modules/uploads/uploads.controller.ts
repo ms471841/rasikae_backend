@@ -29,6 +29,12 @@ const IMAGE_VALIDATORS = [
   new FileTypeValidator({ fileType: '.(png|jpeg|jpg|webp)' }),
 ];
 
+/**
+ * ============================================================================
+ * S3 UPLOADS CONTROLLER
+ * Handles Image Uploads for User Avatars, Restaurant Logos/Covers, Dishes & Categories
+ * ============================================================================
+ */
 @Controller('uploads')
 export class UploadsController {
   constructor(
@@ -37,10 +43,14 @@ export class UploadsController {
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
   ) {}
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // GENERIC endpoints (kept for backward compatibility)
-  // ─────────────────────────────────────────────────────────────────────────
+  // --------------------------------------------------------------------------
+  // 🌐 GENERIC UPLOAD APIs
+  // --------------------------------------------------------------------------
 
+  /**
+   * [🌐 COMMON / ALL APPS] Upload single image to S3 folder
+   * POST /uploads/image?folder=general
+   */
   @Post('image')
   @UseInterceptors(FileInterceptor('file'))
   async uploadImage(
@@ -53,6 +63,10 @@ export class UploadsController {
     return { url };
   }
 
+  /**
+   * [🌐 COMMON / ALL APPS] Upload multiple images to S3 folder
+   * POST /uploads/images?folder=general
+   */
   @Post('images')
   @UseInterceptors(FilesInterceptor('files', 10))
   async uploadMultipleImages(
@@ -75,14 +89,13 @@ export class UploadsController {
     return { urls };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // ENTITY-SCOPED endpoints
-  // ─────────────────────────────────────────────────────────────────────────
+  // --------------------------------------------------------------------------
+  // 📱 USER APP APIs
+  // --------------------------------------------------------------------------
 
   /**
+   * [📱 USER APP / ALL APPS] Upload user profile avatar
    * POST /uploads/user/:userId/profile
-   * S3 key: users/{userId}/profile/avatar.{ext}
-   * Fixed key → always overwrites the previous profile picture in-place.
    */
   @Post('user/:userId/profile')
   @UseGuards(FirebaseAuthGuard)
@@ -103,10 +116,13 @@ export class UploadsController {
     return { url };
   }
 
+  // --------------------------------------------------------------------------
+  // 🍳 VENDOR APP & 👑 ADMIN PANEL APIs
+  // --------------------------------------------------------------------------
+
   /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Upload restaurant logo image
    * POST /uploads/restaurant/:restaurantId/logo
-   * S3 key: restaurants/{restaurantId}/logo.{ext}
-   * Fixed key → always overwrites the previous logo in-place.
    */
   @Post('restaurant/:restaurantId/logo')
   @UseGuards(FirebaseAuthGuard)
@@ -132,10 +148,8 @@ export class UploadsController {
   }
 
   /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Upload restaurant cover gallery images
    * POST /uploads/restaurant/:restaurantId/cover
-   * S3 key: restaurants/{restaurantId}/cover/{uuid}.{ext}
-   * UUID key → multiple cover images can coexist (gallery).
-   * Accepts up to 5 files in a single request.
    */
   @Post('restaurant/:restaurantId/cover')
   @UseGuards(FirebaseAuthGuard)
@@ -173,9 +187,8 @@ export class UploadsController {
   }
 
   /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Upload menu item primary image
    * POST /uploads/menu-item/:menuItemId/image
-   * S3 key: menu-items/{menuItemId}/image.{ext}
-   * Fixed key → always overwrites the previous primary image in-place.
    */
   @Post('menu-item/:menuItemId/image')
   @UseGuards(FirebaseAuthGuard)
@@ -202,9 +215,8 @@ export class UploadsController {
   }
 
   /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Upload menu item thumbnail image
    * POST /uploads/menu-item/:menuItemId/thumbnail
-   * S3 key: menu-items/{menuItemId}/thumbnail.{ext}
-   * Fixed key → always overwrites the previous thumbnail in-place.
    */
   @Post('menu-item/:menuItemId/thumbnail')
   @UseGuards(FirebaseAuthGuard)
@@ -230,14 +242,13 @@ export class UploadsController {
     return { url };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // MASTER DATA entity-scoped endpoints
-  // ─────────────────────────────────────────────────────────────────────────
+  // --------------------------------------------------------------------------
+  // 👑 ADMIN PANEL APIs
+  // --------------------------------------------------------------------------
 
   /**
+   * [👑 ADMIN PANEL] Upload food category icon/banner image
    * POST /uploads/category/:categoryId/image
-   * S3 key: categories/{categoryId}/image.{ext}
-   * Fixed key → always overwrites the previous category image in-place.
    */
   @Post('category/:categoryId/image')
   @UseGuards(FirebaseAuthGuard)
@@ -259,9 +270,8 @@ export class UploadsController {
   }
 
   /**
+   * [👑 ADMIN PANEL] Upload cuisine icon/banner image
    * POST /uploads/cuisine/:cuisineId/image
-   * S3 key: cuisines/{cuisineId}/image.{ext}
-   * Fixed key → always overwrites the previous cuisine image in-place.
    */
   @Post('cuisine/:cuisineId/image')
   @UseGuards(FirebaseAuthGuard)
@@ -282,4 +292,3 @@ export class UploadsController {
     return { url };
   }
 }
-

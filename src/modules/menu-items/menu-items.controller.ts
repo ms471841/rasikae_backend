@@ -5,17 +5,24 @@ import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
 import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { CurrUser } from '../auth/decorators/user.decorator';
 
+/**
+ * ============================================================================
+ * MENU ITEMS CONTROLLER
+ * Handles Dishes, Variants, Addon Groups & Restaurant Menu Structure
+ * ============================================================================
+ */
 @Controller('menu-items')
 export class MenuItemsController {
   constructor(private readonly menuItemsService: MenuItemsService) {}
 
-  @Post()
-  @UseGuards(FirebaseAuthGuard)
-  @HttpCode(HttpStatus.CREATED)
-  create(@CurrUser() user: any, @Body() createMenuItemDto: CreateMenuItemDto) {
-    return this.menuItemsService.create(createMenuItemDto, user);
-  }
+  // --------------------------------------------------------------------------
+  // 📱 USER APP APIs
+  // --------------------------------------------------------------------------
 
+  /**
+   * [📱 USER APP / 👑 ADMIN] Get all menu items with search & filters
+   * GET /menu-items?page=1&limit=20&search=burger
+   */
   @Get()
   findAll(
     @Query('page') page?: string,
@@ -36,6 +43,10 @@ export class MenuItemsController {
     return this.menuItemsService.findAll(parsedPage, parsedLimit, filters);
   }
 
+  /**
+   * [📱 USER APP] Get menu items belonging to a specific restaurant
+   * GET /menu-items/restaurant/:id
+   */
   @Get('restaurant/:id')
   findByRestaurant(
     @Param('id') id: string,
@@ -53,22 +64,53 @@ export class MenuItemsController {
     return this.menuItemsService.findByRestaurant(id, parsedPage, parsedLimit, filters);
   }
 
+  /**
+   * [📱 USER APP] Get menu items grouped by categories for restaurant detail screen
+   * GET /menu-items/restaurant/:id/grouped
+   */
   @Get('restaurant/:id/grouped')
   findByRestaurantGrouped(@Param('id') id: string) {
     return this.menuItemsService.getGroupedMenuByRestaurant(id);
   }
 
+  /**
+   * [📱 USER APP / 🍳 VENDOR / 👑 ADMIN] Get single menu item details by ID
+   * GET /menu-items/:id
+   */
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.menuItemsService.findOne(id);
   }
 
+  // --------------------------------------------------------------------------
+  // 🍳 VENDOR APP & 👑 ADMIN PANEL APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Create a new menu item for a restaurant
+   * POST /menu-items
+   */
+  @Post()
+  @UseGuards(FirebaseAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  create(@CurrUser() user: any, @Body() createMenuItemDto: CreateMenuItemDto) {
+    return this.menuItemsService.create(createMenuItemDto, user);
+  }
+
+  /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Update menu item details, price or availability
+   * PATCH /menu-items/:id
+   */
   @Patch(':id')
   @UseGuards(FirebaseAuthGuard)
   update(@CurrUser() user: any, @Param('id') id: string, @Body() updateMenuItemDto: UpdateMenuItemDto) {
     return this.menuItemsService.update(id, updateMenuItemDto, user);
   }
 
+  /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Delete a menu item
+   * DELETE /menu-items/:id
+   */
   @Delete(':id')
   @UseGuards(FirebaseAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)

@@ -6,10 +6,46 @@ import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
+/**
+ * ============================================================================
+ * FOOD CATEGORIES CONTROLLER
+ * Handles Food Categories Master Data
+ * ============================================================================
+ */
 @Controller('categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
+  // --------------------------------------------------------------------------
+  // 🌐 PUBLIC / 📱 USER APP APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * [📱 USER APP / 🌐 PUBLIC] Get all active food categories
+   * GET /categories
+   */
+  @Get()
+  findAll() {
+    return this.categoriesService.findAll();
+  }
+
+  /**
+   * [📱 USER APP / 🌐 PUBLIC] Get single food category by ID
+   * GET /categories/:id
+   */
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.categoriesService.findOne(id);
+  }
+
+  // --------------------------------------------------------------------------
+  // 👑 ADMIN PANEL APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * [👑 ADMIN PANEL] Create a new food category
+   * POST /categories
+   */
   @Post()
   @UseGuards(FirebaseAuthGuard, RolesGuard)
   @Roles('admin')
@@ -17,16 +53,10 @@ export class CategoriesController {
     return this.categoriesService.create(createCategoryDto);
   }
 
-  @Get()
-  findAll() {
-    return this.categoriesService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.categoriesService.findOne(id);
-  }
-
+  /**
+   * [👑 ADMIN PANEL] Update food category
+   * PATCH /categories/:id
+   */
   @Patch(':id')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
   @Roles('admin')
@@ -34,6 +64,10 @@ export class CategoriesController {
     return this.categoriesService.update(id, updateCategoryDto);
   }
 
+  /**
+   * [👑 ADMIN PANEL] Delete food category
+   * DELETE /categories/:id
+   */
   @Delete(':id')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
   @Roles('admin')

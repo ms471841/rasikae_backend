@@ -5,10 +5,24 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrUser } from '../auth/decorators/user.decorator';
 
+/**
+ * ============================================================================
+ * ANALYTICS & DASHBOARD METRICS CONTROLLER
+ * Handles System Analytics, Weekly Trends & Vendor Restaurant Metrics
+ * ============================================================================
+ */
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
+  // --------------------------------------------------------------------------
+  // 👑 ADMIN PANEL APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * [👑 ADMIN PANEL] Get system-wide platform statistics & revenue overview
+   * GET /analytics/global
+   */
   @Get('global')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
   @Roles('admin')
@@ -16,6 +30,10 @@ export class AnalyticsController {
     return this.analyticsService.getGlobalStats();
   }
 
+  /**
+   * [👑 ADMIN PANEL] Get weekly revenue & order volume trend charts
+   * GET /analytics/trends
+   */
   @Get('trends')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
   @Roles('admin')
@@ -23,6 +41,14 @@ export class AnalyticsController {
     return this.analyticsService.getWeeklyTrends();
   }
 
+  // --------------------------------------------------------------------------
+  // 🍳 VENDOR APP APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Get dashboard analytics for a specific restaurant
+   * GET /analytics/restaurant/:restaurantId
+   */
   @Get('restaurant/:restaurantId')
   @UseGuards(FirebaseAuthGuard)
   getRestaurantAnalytics(@CurrUser() user: any, @Param('restaurantId') restaurantId: string) {

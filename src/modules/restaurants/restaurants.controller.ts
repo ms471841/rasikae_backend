@@ -6,6 +6,12 @@ import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { CurrUser } from '../auth/decorators/user.decorator';
 import { UsersService } from '../users/users.service';
 
+/**
+ * ============================================================================
+ * RESTAURANTS CONTROLLER
+ * Handles Home Feed, Restaurant Listings, Vendor Restaurant Management & Bank Accounts
+ * ============================================================================
+ */
 @Controller('restaurants')
 export class RestaurantsController {
   constructor(
@@ -13,26 +19,14 @@ export class RestaurantsController {
     private readonly usersService: UsersService,
   ) {}
 
-  @Post()
-  @UseGuards(FirebaseAuthGuard)
-  async create(
-    @CurrUser() user: any,
-    @Body() createRestaurantDto: CreateRestaurantDto & { ownerId?: string },
-  ) {
-    const uid = user.uid || user.firebaseUid;
-    const mongoUser = await this.usersService.getProfile(uid);
-    
-    // Default to the current user as owner
-    let targetOwnerId = mongoUser._id.toString();
-    
-    // If admin provides an ownerId, override it
-    if (mongoUser.role === 'admin' && createRestaurantDto.ownerId) {
-      targetOwnerId = createRestaurantDto.ownerId;
-    }
-    
-    return this.restaurantsService.create(targetOwnerId, createRestaurantDto);
-  }
+  // --------------------------------------------------------------------------
+  // 📱 USER APP APIs
+  // --------------------------------------------------------------------------
 
+  /**
+   * [📱 USER APP] Get curated home screen feed with location & filter support
+   * GET /restaurants/home-feed?lat=...&lng=...&limit=10
+   */
   @Get('home-feed')
   async getHomeFeed(
     @Query('lat') lat?: string,
@@ -67,6 +61,10 @@ export class RestaurantsController {
     return this.restaurantsService.getHomeFeed(parsedLat, parsedLng, parsedLimit, filters);
   }
 
+  /**
+   * [📱 USER APP / 👑 ADMIN / 🍳 VENDOR] Get paginated restaurant list with filters
+   * GET /restaurants?page=1&limit=10&search=pizza
+   */
   @Get()
   async findAll(
     @Query('page') page?: string,
@@ -109,6 +107,45 @@ export class RestaurantsController {
     return this.restaurantsService.findAll(parsedPage, parsedLimit, parsedLat, parsedLng, filters);
   }
 
+  /**
+   * [📱 USER APP / 🍳 VENDOR / 👑 ADMIN] Get single restaurant detail by ID
+   * GET /restaurants/:id
+   */
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.restaurantsService.findOne(id);
+  }
+
+  // --------------------------------------------------------------------------
+  // 🍳 VENDOR APP & 👑 ADMIN PANEL APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Create a new restaurant
+   * POST /restaurants
+   */
+  @Post()
+  @UseGuards(FirebaseAuthGuard)
+  async create(
+    @CurrUser() user: any,
+    @Body() createRestaurantDto: CreateRestaurantDto & { ownerId?: string },
+  ) {
+    const uid = user.uid || user.firebaseUid;
+    const mongoUser = await this.usersService.getProfile(uid);
+    
+    let targetOwnerId = mongoUser._id.toString();
+    
+    if (mongoUser.role === 'admin' && createRestaurantDto.ownerId) {
+      targetOwnerId = createRestaurantDto.ownerId;
+    }
+    
+    return this.restaurantsService.create(targetOwnerId, createRestaurantDto);
+  }
+
+  /**
+   * [🍳 VENDOR APP] Get restaurants owned by logged-in vendor user
+   * GET /restaurants/my-restaurants
+   */
   @Get('my-restaurants')
   @UseGuards(FirebaseAuthGuard)
   async findMyRestaurants(@CurrUser() user: any) {
@@ -117,11 +154,10 @@ export class RestaurantsController {
     return this.restaurantsService.findByOwner(mongoUser._id.toString());
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.restaurantsService.findOne(id);
-  }
-
+  /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Update restaurant profile, status, or timing
+   * PATCH /restaurants/:id
+   */
   @Patch(':id')
   @UseGuards(FirebaseAuthGuard)
   async update(
@@ -132,12 +168,20 @@ export class RestaurantsController {
     return this.restaurantsService.update(id, updateRestaurantDto, user);
   }
 
+  /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Get bank account details for payouts
+   * GET /restaurants/:id/bank-account
+   */
   @Get(':id/bank-account')
   @UseGuards(FirebaseAuthGuard)
   async getBankAccount(@CurrUser() user: any, @Param('id') id: string) {
     return this.restaurantsService.getBankAccount(id, user);
   }
 
+  /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Save/update bank account details for payouts
+   * POST /restaurants/:id/bank-account
+   */
   @Post(':id/bank-account')
   @UseGuards(FirebaseAuthGuard)
   async upsertBankAccount(
@@ -148,6 +192,10 @@ export class RestaurantsController {
     return this.restaurantsService.upsertBankAccount(id, bankAccountData, user);
   }
 
+  /**
+   * [🍳 VENDOR APP / 👑 ADMIN] Delete a restaurant
+   * DELETE /restaurants/:id
+   */
   @Delete(':id')
   @UseGuards(FirebaseAuthGuard)
   async remove(@CurrUser() user: any, @Param('id') id: string) {
