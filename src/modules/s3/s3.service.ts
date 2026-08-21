@@ -1,5 +1,9 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -10,11 +14,14 @@ export class S3Service {
   private readonly region: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.region = this.configService.get<string>('AWS_S3_REGION') || 'ap-south-1';
+    this.region =
+      this.configService.get<string>('AWS_S3_REGION') || 'ap-south-1';
     this.bucketName = this.configService.get<string>('AWS_S3_BUCKET_NAME')!;
 
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID')!;
-    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY')!;
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    )!;
 
     this.s3Client = new S3Client({
       region: this.region,
@@ -28,7 +35,7 @@ export class S3Service {
   /** Generic upload — generates a UUID filename inside the given folder. */
   async uploadFile(
     file: Express.Multer.File,
-    folder: string = 'general'
+    folder: string = 'general',
   ): Promise<string> {
     const fileExtension = file.originalname.split('.').pop();
     const s3Key = `${folder}/${uuidv4()}.${fileExtension}`;

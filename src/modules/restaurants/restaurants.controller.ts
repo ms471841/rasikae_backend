@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { RestaurantsService } from './restaurants.service';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
@@ -45,7 +55,7 @@ export class RestaurantsController {
     const parsedLat = lat ? parseFloat(lat) : undefined;
     const parsedLng = lng ? parseFloat(lng) : undefined;
     const parsedLimit = limit ? parseInt(limit, 10) : 10;
-    
+
     const filters = {
       minRating: minRating ? parseFloat(minRating) : undefined,
       maxDistance: maxDistance ? parseFloat(maxDistance) : undefined,
@@ -57,8 +67,13 @@ export class RestaurantsController {
       hasOffers: hasOffers === 'true',
       maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
     };
-    
-    return this.restaurantsService.getHomeFeed(parsedLat, parsedLng, parsedLimit, filters);
+
+    return this.restaurantsService.getHomeFeed(
+      parsedLat,
+      parsedLng,
+      parsedLimit,
+      filters,
+    );
   }
 
   /**
@@ -96,7 +111,12 @@ export class RestaurantsController {
       cuisines: cuisines ? cuisines.split(',') : undefined,
       categoryId: categoryId,
       status: status,
-      isPublished: isPublished === 'true' ? true : isPublished === 'false' ? false : undefined,
+      isPublished:
+        isPublished === 'true'
+          ? true
+          : isPublished === 'false'
+            ? false
+            : undefined,
       search: search,
       sortBy: sortBy,
       nearAndFast: nearAndFast === 'true',
@@ -104,7 +124,13 @@ export class RestaurantsController {
       maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
     };
 
-    return this.restaurantsService.findAll(parsedPage, parsedLimit, parsedLat, parsedLng, filters);
+    return this.restaurantsService.findAll(
+      parsedPage,
+      parsedLimit,
+      parsedLat,
+      parsedLng,
+      filters,
+    );
   }
 
   /**
@@ -132,13 +158,13 @@ export class RestaurantsController {
   ) {
     const uid = user.uid || user.firebaseUid;
     const mongoUser = await this.usersService.getProfile(uid);
-    
+
     let targetOwnerId = mongoUser._id.toString();
-    
+
     if (mongoUser.role === 'admin' && createRestaurantDto.ownerId) {
       targetOwnerId = createRestaurantDto.ownerId;
     }
-    
+
     return this.restaurantsService.create(targetOwnerId, createRestaurantDto);
   }
 

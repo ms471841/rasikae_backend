@@ -31,13 +31,16 @@ export class Settings {
   @Prop({ default: false })
   isMaintenanceMode: boolean;
 
-  @Prop({ default: 'Our kitchen is currently undergoing maintenance. We will be back soon!' })
+  @Prop({
+    default:
+      'Our kitchen is currently undergoing maintenance. We will be back soon!',
+  })
   maintenanceMessage: string;
 
   @Prop({ default: '1.0.0' })
   appVersion: string;
 
-  @Prop({ default: 0.10 }) // Default 10%
+  @Prop({ default: 0.1 }) // Default 10%
   platformCommissionPercentage: number;
 
   @Prop({ type: SupportContactSchema, default: {} })

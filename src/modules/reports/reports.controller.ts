@@ -31,13 +31,18 @@ export class ReportsController {
     @Query('end') end: string,
     @Res() res: express.Response,
   ) {
-    const startDate = new Date(start || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+    const startDate = new Date(
+      start || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    );
     const endDate = new Date(end || new Date().toISOString());
-    
+
     const csv = await this.reportsService.generateOrdersCsv(startDate, endDate);
-    
+
     res.set('Content-Type', 'text/csv');
-    res.set('Content-Disposition', `attachment; filename=orders_report_${Date.now()}.csv`);
+    res.set(
+      'Content-Disposition',
+      `attachment; filename=orders_report_${Date.now()}.csv`,
+    );
     res.status(200).send(csv);
   }
 
@@ -51,13 +56,21 @@ export class ReportsController {
     @Query('end') end: string,
     @Res() res: express.Response,
   ) {
-    const startDate = new Date(start || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+    const startDate = new Date(
+      start || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    );
     const endDate = new Date(end || new Date().toISOString());
-    
-    const csv = await this.reportsService.generateTransactionsCsv(startDate, endDate);
-    
+
+    const csv = await this.reportsService.generateTransactionsCsv(
+      startDate,
+      endDate,
+    );
+
     res.set('Content-Type', 'text/csv');
-    res.set('Content-Disposition', `attachment; filename=transactions_report_${Date.now()}.csv`);
+    res.set(
+      'Content-Disposition',
+      `attachment; filename=transactions_report_${Date.now()}.csv`,
+    );
     res.status(200).send(csv);
   }
 
@@ -68,9 +81,12 @@ export class ReportsController {
   @Get('users')
   async exportUsers(@Res() res: express.Response) {
     const csv = await this.reportsService.generateUsersCsv();
-    
+
     res.set('Content-Type', 'text/csv');
-    res.set('Content-Disposition', `attachment; filename=users_report_${Date.now()}.csv`);
+    res.set(
+      'Content-Disposition',
+      `attachment; filename=users_report_${Date.now()}.csv`,
+    );
     res.status(200).send(csv);
   }
 }

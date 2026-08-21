@@ -47,13 +47,23 @@ const AddonGroupSchema = SchemaFactory.createForClass(AddonGroup);
 
 @Schema({ timestamps: true })
 export class MenuItem {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Restaurant',
+    required: true,
+  })
   restaurantId: mongoose.Types.ObjectId;
 
-  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], default: [] })
+  @Prop({
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
+    default: [],
+  })
   categoryIds: mongoose.Types.ObjectId[];
 
-  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Cuisine' }], default: [] })
+  @Prop({
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Cuisine' }],
+    default: [],
+  })
   cuisines: mongoose.Types.ObjectId[];
 
   @Prop({ required: true })
@@ -106,3 +116,6 @@ export class MenuItem {
 }
 
 export const MenuItemSchema = SchemaFactory.createForClass(MenuItem);
+
+MenuItemSchema.index({ restaurantId: 1, isAvailable: 1 });
+MenuItemSchema.index({ categoryIds: 1 });

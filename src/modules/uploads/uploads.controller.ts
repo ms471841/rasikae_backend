@@ -20,8 +20,14 @@ import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { v4 as uuidv4 } from 'uuid';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Restaurant, RestaurantDocument } from '../restaurants/schemas/restaurant.schema';
-import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
+import {
+  Restaurant,
+  RestaurantDocument,
+} from '../restaurants/schemas/restaurant.schema';
+import {
+  MenuItem,
+  MenuItemDocument,
+} from '../menu-items/schemas/menu-item.schema';
 import { CurrUser } from '../auth/decorators/user.decorator';
 
 const IMAGE_VALIDATORS = [
@@ -39,9 +45,31 @@ const IMAGE_VALIDATORS = [
 export class UploadsController {
   constructor(
     private readonly s3Service: S3Service,
-    @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
+    @InjectModel(Restaurant.name)
+    private restaurantModel: Model<RestaurantDocument>,
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
   ) {}
+
+  private static readonly ALLOWED_FOLDERS = [
+    'general',
+    'avatars',
+    'covers',
+    'menu',
+    'categories',
+    'cuisines',
+    'temp',
+  ];
+
+  private sanitizeFolder(folder: string): string {
+    const cleanFolder = (folder || 'general')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '');
+    if (!UploadsController.ALLOWED_FOLDERS.includes(cleanFolder)) {
+      return 'general';
+    }
+    return cleanFolder;
+  }
 
   // --------------------------------------------------------------------------
   // 🌐 GENERIC UPLOAD APIs
@@ -52,6 +80,7 @@ export class UploadsController {
    * POST /uploads/image?folder=general
    */
   @Post('image')
+  @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadImage(
     @UploadedFile(new ParseFilePipe({ validators: IMAGE_VALIDATORS }))
@@ -59,7 +88,8 @@ export class UploadsController {
     @Query('folder') folder: string = 'general',
   ) {
     if (!file) throw new BadRequestException('File is required');
-    const url = await this.s3Service.uploadFile(file, folder);
+    const safeFolder = this.sanitizeFolder(folder);
+    const url = await this.s3Service.uploadFile(file, safeFolder);
     return { url };
   }
 
@@ -68,6 +98,7 @@ export class UploadsController {
    * POST /uploads/images?folder=general
    */
   @Post('images')
+  @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FilesInterceptor('files', 10))
   async uploadMultipleImages(
     @UploadedFiles() files: Express.Multer.File[],
@@ -78,13 +109,18 @@ export class UploadsController {
 
     for (const file of files) {
       if (file.size > 5 * 1024 * 1024)
-        throw new BadRequestException(`File ${file.originalname} exceeds 5 MB limit`);
+        throw new BadRequestException(
+          `File ${file.originalname} exceeds 5 MB limit`,
+        );
       if (!file.mimetype.match(/\/(jpg|jpeg|png|webp)$/))
-        throw new BadRequestException(`File ${file.originalname} is not a valid image type`);
+        throw new BadRequestException(
+          `File ${file.originalname} is not a valid image type`,
+        );
     }
 
+    const safeFolder = this.sanitizeFolder(folder);
     const urls = await Promise.all(
-      files.map((f) => this.s3Service.uploadFile(f, folder)),
+      files.map((f) => this.s3Service.uploadFile(f, safeFolder)),
     );
     return { urls };
   }
@@ -107,7 +143,9 @@ export class UploadsController {
     file: Express.Multer.File,
   ) {
     if (user.role !== 'admin' && user._id.toString() !== userId) {
-      throw new ForbiddenException('You cannot upload a profile picture for another user');
+      throw new ForbiddenException(
+        'You cannot upload a profile picture for another user',
+      );
     }
     if (!file) throw new BadRequestException('File is required');
     const ext = file.originalname.split('.').pop();
@@ -134,10 +172,14 @@ export class UploadsController {
     file: Express.Multer.File,
   ) {
     if (user.role !== 'admin') {
-      const restaurant = await this.restaurantModel.findById(restaurantId).exec();
+      const restaurant = await this.restaurantModel
+        .findById(restaurantId)
+        .exec();
       if (!restaurant) throw new NotFoundException('Restaurant not found');
       if (restaurant.ownerId.toString() !== user._id.toString()) {
-        throw new ForbiddenException('You are not authorized to upload logo for this restaurant');
+        throw new ForbiddenException(
+          'You are not authorized to upload logo for this restaurant',
+        );
       }
     }
     if (!file) throw new BadRequestException('File is required');
@@ -160,10 +202,14 @@ export class UploadsController {
     @UploadedFiles() files: Express.Multer.File[],
   ) {
     if (user.role !== 'admin') {
-      const restaurant = await this.restaurantModel.findById(restaurantId).exec();
+      const restaurant = await this.restaurantModel
+        .findById(restaurantId)
+        .exec();
       if (!restaurant) throw new NotFoundException('Restaurant not found');
       if (restaurant.ownerId.toString() !== user._id.toString()) {
-        throw new ForbiddenException('You are not authorized to upload cover images for this restaurant');
+        throw new ForbiddenException(
+          'You are not authorized to upload cover images for this restaurant',
+        );
       }
     }
     if (!files || files.length === 0)
@@ -171,9 +217,13 @@ export class UploadsController {
 
     for (const file of files) {
       if (file.size > 5 * 1024 * 1024)
-        throw new BadRequestException(`File ${file.originalname} exceeds 5 MB limit`);
+        throw new BadRequestException(
+          `File ${file.originalname} exceeds 5 MB limit`,
+        );
       if (!file.mimetype.match(/\/(jpg|jpeg|png|webp)$/))
-        throw new BadRequestException(`File ${file.originalname} is not a valid image type`);
+        throw new BadRequestException(
+          `File ${file.originalname} is not a valid image type`,
+        );
     }
 
     const urls = await Promise.all(
@@ -202,9 +252,16 @@ export class UploadsController {
     if (user.role !== 'admin') {
       const menuItem = await this.menuItemModel.findById(menuItemId).exec();
       if (!menuItem) throw new NotFoundException('Menu item not found');
-      const restaurant = await this.restaurantModel.findById(menuItem.restaurantId).exec();
-      if (!restaurant || restaurant.ownerId.toString() !== user._id.toString()) {
-        throw new ForbiddenException('You are not authorized to upload image for this menu item');
+      const restaurant = await this.restaurantModel
+        .findById(menuItem.restaurantId)
+        .exec();
+      if (
+        !restaurant ||
+        restaurant.ownerId.toString() !== user._id.toString()
+      ) {
+        throw new ForbiddenException(
+          'You are not authorized to upload image for this menu item',
+        );
       }
     }
     if (!file) throw new BadRequestException('File is required');
@@ -230,9 +287,16 @@ export class UploadsController {
     if (user.role !== 'admin') {
       const menuItem = await this.menuItemModel.findById(menuItemId).exec();
       if (!menuItem) throw new NotFoundException('Menu item not found');
-      const restaurant = await this.restaurantModel.findById(menuItem.restaurantId).exec();
-      if (!restaurant || restaurant.ownerId.toString() !== user._id.toString()) {
-        throw new ForbiddenException('You are not authorized to upload thumbnail for this menu item');
+      const restaurant = await this.restaurantModel
+        .findById(menuItem.restaurantId)
+        .exec();
+      if (
+        !restaurant ||
+        restaurant.ownerId.toString() !== user._id.toString()
+      ) {
+        throw new ForbiddenException(
+          'You are not authorized to upload thumbnail for this menu item',
+        );
       }
     }
     if (!file) throw new BadRequestException('File is required');
@@ -260,7 +324,9 @@ export class UploadsController {
     file: Express.Multer.File,
   ) {
     if (user.role !== 'admin') {
-      throw new ForbiddenException('Only admin users can upload category images');
+      throw new ForbiddenException(
+        'Only admin users can upload category images',
+      );
     }
     if (!file) throw new BadRequestException('File is required');
     const ext = file.originalname.split('.').pop();
@@ -283,7 +349,9 @@ export class UploadsController {
     file: Express.Multer.File,
   ) {
     if (user.role !== 'admin') {
-      throw new ForbiddenException('Only admin users can upload cuisine images');
+      throw new ForbiddenException(
+        'Only admin users can upload cuisine images',
+      );
     }
     if (!file) throw new BadRequestException('File is required');
     const ext = file.originalname.split('.').pop();

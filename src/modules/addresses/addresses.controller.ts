@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, HttpCode, HttpStatus, UseGuards, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  ForbiddenException,
+} from '@nestjs/common';
 import { AddressesService } from './addresses.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
@@ -27,67 +40,68 @@ export class AddressesController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   create(@CurrUser() user: any, @Body() createAddressDto: CreateAddressDto) {
-    if (user.role !== 'admin' && user._id.toString() !== createAddressDto.userId) {
-      throw new ForbiddenException('You cannot create an address for another user');
+    if (
+      user.role !== 'admin' &&
+      user._id.toString() !== createAddressDto.userId
+    ) {
+      throw new ForbiddenException(
+        'You cannot create an address for another user',
+      );
     }
     return this.addressesService.create(createAddressDto);
   }
 
   /**
    * [📱 USER APP] Get list of all saved delivery addresses for a user
-   * GET /addresses?userId=...
+   * GET /addresses
    */
   @Get()
-  findAllByUser(@CurrUser() user: any, @Query('userId') userId: string) {
-    if (user.role !== 'admin' && user._id.toString() !== userId) {
-      throw new ForbiddenException('You cannot access addresses of another user');
-    }
-    return this.addressesService.findAllByUser(userId);
+  findAllByUser(@CurrUser() user: any, @Query('userId') userId?: string) {
+    const targetUserId = user.role === 'admin' && userId ? userId : user._id.toString();
+    return this.addressesService.findAllByUser(targetUserId);
   }
 
   /**
    * [📱 USER APP] Get single saved address detail by ID
-   * GET /addresses/:id?userId=...
+   * GET /addresses/:id
    */
   @Get(':id')
-  findOne(@CurrUser() user: any, @Param('id') id: string, @Query('userId') userId: string) {
-    if (user.role !== 'admin' && user._id.toString() !== userId) {
-      throw new ForbiddenException('You cannot access addresses of another user');
-    }
-    return this.addressesService.findOne(id, userId);
+  findOne(
+    @CurrUser() user: any,
+    @Param('id') id: string,
+    @Query('userId') userId?: string,
+  ) {
+    const targetUserId = user.role === 'admin' && userId ? userId : user._id.toString();
+    return this.addressesService.findOne(id, targetUserId);
   }
 
   /**
    * [📱 USER APP] Update a saved address
-   * PATCH /addresses/:id?userId=...
+   * PATCH /addresses/:id
    */
   @Patch(':id')
   update(
     @CurrUser() user: any,
     @Param('id') id: string,
-    @Query('userId') userId: string,
-    @Body() updateAddressDto: UpdateAddressDto
+    @Body() updateAddressDto: UpdateAddressDto,
+    @Query('userId') userId?: string,
   ) {
-    if (user.role !== 'admin' && user._id.toString() !== userId) {
-      throw new ForbiddenException('You cannot modify addresses of another user');
-    }
-    return this.addressesService.update(id, userId, updateAddressDto);
+    const targetUserId = user.role === 'admin' && userId ? userId : user._id.toString();
+    return this.addressesService.update(id, targetUserId, updateAddressDto);
   }
 
   /**
    * [📱 USER APP] Delete a saved address
-   * DELETE /addresses/:id?userId=...
+   * DELETE /addresses/:id
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
     @CurrUser() user: any,
     @Param('id') id: string,
-    @Query('userId') userId: string
+    @Query('userId') userId?: string,
   ) {
-    if (user.role !== 'admin' && user._id.toString() !== userId) {
-      throw new ForbiddenException('You cannot delete addresses of another user');
-    }
-    return this.addressesService.remove(id, userId);
+    const targetUserId = user.role === 'admin' && userId ? userId : user._id.toString();
+    return this.addressesService.remove(id, targetUserId);
   }
 }

@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  HttpCode,
+  HttpStatus,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { DriversService } from './drivers.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { OnboardDriverDto } from './dto/onboard-driver.dto';
@@ -67,7 +78,7 @@ export class DriversController {
   updateStatus(
     @CurrUser() user: any,
     @Param('id') id: string,
-    @Body() updateDriverStatusDto: UpdateDriverStatusDto
+    @Body() updateDriverStatusDto: UpdateDriverStatusDto,
   ) {
     return this.driversService.updateStatus(id, updateDriverStatusDto, user);
   }
@@ -81,7 +92,7 @@ export class DriversController {
   updateLocation(
     @CurrUser() user: any,
     @Param('id') id: string,
-    @Body() updateLocationDto: UpdateLocationDto
+    @Body() updateLocationDto: UpdateLocationDto,
   ) {
     return this.driversService.updateLocation(id, updateLocationDto, user);
   }
@@ -145,12 +156,16 @@ export class DriversController {
   @Get('nearby')
   @UseGuards(FirebaseAuthGuard)
   findNearbyAvailable(
-    @Query('lng') lng: string, 
-    @Query('lat') lat: string, 
-    @Query('distance') distance: string
+    @Query('lng') lng: string,
+    @Query('lat') lat: string,
+    @Query('distance') distance: string,
   ) {
     if (!lng || !lat) throw new Error('Longitude and Latitude are required.');
     const maxDistance = distance ? parseInt(distance, 10) : 10000; // 10km default
-    return this.driversService.findNearbyAvailable(parseFloat(lng), parseFloat(lat), maxDistance);
+    return this.driversService.findNearbyAvailable(
+      parseFloat(lng),
+      parseFloat(lat),
+      maxDistance,
+    );
   }
 }

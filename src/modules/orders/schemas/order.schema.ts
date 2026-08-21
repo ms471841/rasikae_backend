@@ -64,7 +64,11 @@ const SelectedAddonSchema = SchemaFactory.createForClass(SelectedAddon);
 
 @Schema()
 export class OrderItem {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MenuItem',
+    required: true,
+  })
   menuItemId: mongoose.Types.ObjectId;
 
   @Prop({ required: true })
@@ -93,10 +97,18 @@ export class Order {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   userId: mongoose.Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Restaurant',
+    required: true,
+  })
   restaurantId: mongoose.Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Driver', required: false })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Driver',
+    required: false,
+  })
   driverId?: mongoose.Types.ObjectId;
 
   @Prop({ type: [OrderItemSchema], required: true })
@@ -158,3 +170,8 @@ export class Order {
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
+
+OrderSchema.index({ userId: 1, createdAt: -1 });
+OrderSchema.index({ restaurantId: 1, status: 1, createdAt: -1 });
+OrderSchema.index({ driverId: 1, status: 1 });
+OrderSchema.index({ status: 1, createdAt: -1 });

@@ -33,7 +33,7 @@ export class SearchController {
 
     const parsedLat = lat ? parseFloat(lat) : undefined;
     const parsedLng = lng ? parseFloat(lng) : undefined;
-    
+
     const filters = {
       isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
       minRating: minRating ? parseFloat(minRating) : undefined,

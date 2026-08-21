@@ -1,7 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Promotion, PromotionDocument, DiscountType } from './schemas/promotion.schema';
+import {
+  Promotion,
+  PromotionDocument,
+  DiscountType,
+} from './schemas/promotion.schema';
 import { CreatePromotionDto } from './dto/create-promotion.dto';
 import { UpdatePromotionDto } from './dto/update-promotion.dto';
 import { ValidatePromotionDto } from './dto/validate-promotion.dto';
@@ -9,11 +17,14 @@ import { ValidatePromotionDto } from './dto/validate-promotion.dto';
 @Injectable()
 export class PromotionsService {
   constructor(
-    @InjectModel(Promotion.name) private promotionModel: Model<PromotionDocument>,
+    @InjectModel(Promotion.name)
+    private promotionModel: Model<PromotionDocument>,
   ) {}
 
   async create(createPromotionDto: CreatePromotionDto): Promise<Promotion> {
-    const existing = await this.promotionModel.findOne({ code: createPromotionDto.code.toUpperCase() }).exec();
+    const existing = await this.promotionModel
+      .findOne({ code: createPromotionDto.code.toUpperCase() })
+      .exec();
     if (existing) {
       throw new BadRequestException('Promotion code already exists');
     }
@@ -33,12 +44,13 @@ export class PromotionsService {
     return promotion;
   }
 
-  async update(id: string, updatePromotionDto: UpdatePromotionDto): Promise<Promotion> {
-    const promotion = await this.promotionModel.findByIdAndUpdate(
-      id,
-      updatePromotionDto,
-      { returnDocument: 'after' },
-    ).exec();
+  async update(
+    id: string,
+    updatePromotionDto: UpdatePromotionDto,
+  ): Promise<Promotion> {
+    const promotion = await this.promotionModel
+      .findByIdAndUpdate(id, updatePromotionDto, { returnDocument: 'after' })
+      .exec();
 
     if (!promotion) {
       throw new NotFoundException(`Promotion with ID ${id} not found`);
@@ -46,11 +58,18 @@ export class PromotionsService {
     return promotion;
   }
 
-  async validateCoupon(validateDto: ValidatePromotionDto): Promise<{ valid: boolean, discountAmount: number, finalTotal: number, message: string }> {
+  async validateCoupon(validateDto: ValidatePromotionDto): Promise<{
+    valid: boolean;
+    discountAmount: number;
+    finalTotal: number;
+    message: string;
+  }> {
     const { code, cartTotal, restaurantId, userId } = validateDto;
-    
-    const promotion = await this.promotionModel.findOne({ code: code.toUpperCase() }).exec();
-    
+
+    const promotion = await this.promotionModel
+      .findOne({ code: code.toUpperCase() })
+      .exec();
+
     if (!promotion) {
       throw new NotFoundException('Invalid promotion code');
     }
@@ -69,21 +88,32 @@ export class PromotionsService {
     }
 
     if (promotion.minOrderValue > 0 && cartTotal < promotion.minOrderValue) {
-      throw new BadRequestException(`Minimum order value of ${promotion.minOrderValue} required for this promotion`);
+      throw new BadRequestException(
+        `Minimum order value of ${promotion.minOrderValue} required for this promotion`,
+      );
     }
 
     if (promotion.usageLimit && promotion.usedCount >= promotion.usageLimit) {
-      throw new BadRequestException('This promotion has reached its usage limit');
+      throw new BadRequestException(
+        'This promotion has reached its usage limit',
+      );
     }
 
-    if (promotion.restaurantId && promotion.restaurantId.toString() !== restaurantId) {
-      throw new BadRequestException('This promotion inside invalid for the current restaurant');
+    if (
+      promotion.restaurantId &&
+      promotion.restaurantId.toString() !== restaurantId
+    ) {
+      throw new BadRequestException(
+        'This promotion inside invalid for the current restaurant',
+      );
     }
 
     // Check if user already used it
-    const hasUsed = promotion.usedBy.some(id => id.toString() === userId);
+    const hasUsed = promotion.usedBy.some((id) => id.toString() === userId);
     if (hasUsed) {
-      throw new BadRequestException('You have already used this promotion code');
+      throw new BadRequestException(
+        'You have already used this promotion code',
+      );
     }
 
     // Calculate discount
@@ -113,11 +143,13 @@ export class PromotionsService {
   }
 
   async recordPromotionUsage(code: string, userId: string): Promise<void> {
-    const promotion = await this.promotionModel.findOne({ code: code.toUpperCase() }).exec();
+    const promotion = await this.promotionModel
+      .findOne({ code: code.toUpperCase() })
+      .exec();
     if (promotion) {
       promotion.usedCount += 1;
-      if (!promotion.usedBy.some(id => id.toString() === userId)) {
-         promotion.usedBy.push(new Types.ObjectId(userId));
+      if (!promotion.usedBy.some((id) => id.toString() === userId)) {
+        promotion.usedBy.push(new Types.ObjectId(userId));
       }
       await promotion.save();
     }

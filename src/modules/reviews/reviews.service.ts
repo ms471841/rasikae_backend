@@ -1,11 +1,21 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Review, ReviewDocument, TargetType } from './schemas/review.schema';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
-import { Restaurant, RestaurantDocument } from '../restaurants/schemas/restaurant.schema';
-import { MenuItem, MenuItemDocument } from '../menu-items/schemas/menu-item.schema';
+import {
+  Restaurant,
+  RestaurantDocument,
+} from '../restaurants/schemas/restaurant.schema';
+import {
+  MenuItem,
+  MenuItemDocument,
+} from '../menu-items/schemas/menu-item.schema';
 import { Driver, DriverDocument } from '../drivers/schemas/driver.schema';
 
 @Injectable()
@@ -13,7 +23,8 @@ export class ReviewsService {
   constructor(
     @InjectModel(Review.name) private reviewModel: Model<ReviewDocument>,
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
-    @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
+    @InjectModel(Restaurant.name)
+    private restaurantModel: Model<RestaurantDocument>,
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
     @InjectModel(Driver.name) private driverModel: Model<DriverDocument>,
   ) {}
@@ -29,10 +40,23 @@ export class ReviewsService {
       throw new BadRequestException('Invalid Target ID format');
     }
 
-    // 1. Validate the order exists and is completed (DELIVERED)
+    // 1. Validate the order exists, is DELIVERED, and belongs to this user
     const order = await this.orderModel.findById(orderId).exec();
     if (!order) {
       throw new NotFoundException(`Order not found`);
+    }
+
+    if (
+      !createReviewDto.userId ||
+      order.userId.toString() !== createReviewDto.userId.toString()
+    ) {
+      throw new BadRequestException(
+        'You cannot review an order placed by another user',
+      );
+    }
+
+    if (order.status !== 'DELIVERED') {
+      throw new BadRequestException('You can only review delivered orders');
     }
 
     if (order.isReviewed && targetType === TargetType.RESTAURANT) {
@@ -40,14 +64,18 @@ export class ReviewsService {
     }
 
     // 2. Prevent duplicate reviews for the same target and order
-    const existingReview = await this.reviewModel.findOne({
-      orderId: new Types.ObjectId(orderId),
-      targetId: new Types.ObjectId(targetId),
-      targetType
-    }).exec();
+    const existingReview = await this.reviewModel
+      .findOne({
+        orderId: new Types.ObjectId(orderId),
+        targetId: new Types.ObjectId(targetId),
+        targetType,
+      })
+      .exec();
 
     if (existingReview) {
-      throw new BadRequestException('You have already reviewed this item for this order.');
+      throw new BadRequestException(
+        'You have already reviewed this item for this order.',
+      );
     }
 
     // 3. Save the review
@@ -60,7 +88,7 @@ export class ReviewsService {
       await order.save();
     }
 
-    // 4. Update the Target Entity's Aggregate Rating concurrently
+    // 5. Update the Target Entity's Aggregate Rating concurrently
     let targetModel: Model<any>;
     if (targetType === TargetType.RESTAURANT) {
       targetModel = this.restaurantModel;
@@ -73,14 +101,15 @@ export class ReviewsService {
     }
 
     const entity = await targetModel.findById(targetId).session(null).exec();
-    
+
     if (entity) {
       // Safely perform average math
       const currentRatingCount = entity.ratingCount || 0;
       const currentRating = entity.rating || 0;
-      
+
       const newRatingCount = currentRatingCount + 1;
-      const newRating = ((currentRating * currentRatingCount) + rating) / newRatingCount;
+      const newRating =
+        (currentRating * currentRatingCount + rating) / newRatingCount;
 
       entity.rating = Number(newRating.toFixed(2));
       entity.ratingCount = newRatingCount;
@@ -89,7 +118,7 @@ export class ReviewsService {
       if (typeof entity.ratingSum !== 'undefined') {
         entity.ratingSum = (entity.ratingSum || 0) + rating;
       }
-      
+
       await entity.save();
     }
 
@@ -97,13 +126,19 @@ export class ReviewsService {
   }
 
   async findByTarget(targetId: string, targetType: string): Promise<Review[]> {
-    return this.reviewModel.find({ 
-      targetId: new Types.ObjectId(targetId),
-      targetType 
-    }).sort({ createdAt: -1 }).exec();
+    return this.reviewModel
+      .find({
+        targetId: new Types.ObjectId(targetId),
+        targetType,
+      })
+      .sort({ createdAt: -1 })
+      .exec();
   }
 
   async findByUser(userId: string): Promise<Review[]> {
-    return this.reviewModel.find({ userId: new Types.ObjectId(userId) }).sort({ createdAt: -1 }).exec();
+    return this.reviewModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .exec();
   }
 }

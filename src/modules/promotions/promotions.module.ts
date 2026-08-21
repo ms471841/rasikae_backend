@@ -6,7 +6,9 @@ import { Promotion, PromotionSchema } from './schemas/promotion.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Promotion.name, schema: PromotionSchema }]),
+    MongooseModule.forFeature([
+      { name: Promotion.name, schema: PromotionSchema },
+    ]),
   ],
   controllers: [PromotionsController],
   providers: [PromotionsService],

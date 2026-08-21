@@ -1,4 +1,10 @@
-import { IsString, IsNumber, IsBoolean, IsOptional, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsBoolean,
+  IsOptional,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class SupportContactDto {

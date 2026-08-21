@@ -5,7 +5,11 @@ export type BankAccountDocument = BankAccount & Document;
 
 @Schema({ timestamps: true })
 export class BankAccount {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Restaurant',
+    required: true,
+  })
   restaurantId: mongoose.Types.ObjectId;
 
   @Prop({ required: true })

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Inject, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Inject,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as admin from 'firebase-admin';
@@ -14,13 +19,24 @@ export class VendorsService {
     @Inject(FIREBASE_APP) private firebaseApp: admin.app.App,
   ) {}
 
-  async createVendor(data: { name: string, email: string, phone: string, businessName: string, gstNumber?: string, fssaiNumber?: string }): Promise<any> {
+  async createVendor(data: {
+    name: string;
+    email: string;
+    phone: string;
+    businessName: string;
+    gstNumber?: string;
+    fssaiNumber?: string;
+  }): Promise<any> {
     const { name, email, phone, businessName, gstNumber, fssaiNumber } = data;
 
     // 1. Check if user already exists
-    const existingUser = await this.userModel.findOne({ $or: [{ email }, { phone }] }).exec();
+    const existingUser = await this.userModel
+      .findOne({ $or: [{ email }, { phone }] })
+      .exec();
     if (existingUser) {
-      throw new ConflictException('User with this email or phone already exists');
+      throw new ConflictException(
+        'User with this email or phone already exists',
+      );
     }
 
     // 2. Create Firebase User
@@ -31,7 +47,7 @@ export class VendorsService {
         phoneNumber: phone,
         displayName: name,
         password: 'TemporaryPassword123!', // Admin can reset or user can use forgot password
-        emailVerified: true
+        emailVerified: true,
       });
     } catch (err) {
       throw new ConflictException('Firebase creation failed: ' + err.message);
@@ -44,7 +60,7 @@ export class VendorsService {
       email,
       phone,
       role: 'vendor',
-      isActive: true
+      isActive: true,
     });
     await user.save();
 
@@ -54,23 +70,23 @@ export class VendorsService {
       businessName,
       gstNumber,
       fssaiNumber,
-      verificationStatus: 'VERIFIED' // Since admin is creating it, we can auto-verify or leave as PENDING
+      verificationStatus: 'VERIFIED', // Since admin is creating it, we can auto-verify or leave as PENDING
     });
     await vendor.save();
 
     return { user, vendor };
   }
 
-  async findAll(page = 1, limit = 20, search = ""): Promise<any> {
+  async findAll(page = 1, limit = 20, search = ''): Promise<any> {
     const skip = (page - 1) * limit;
-    
+
     let query = {};
     if (search) {
-      query = { 
+      query = {
         $or: [
           { businessName: { $regex: search, $options: 'i' } },
-          { fssaiNumber: { $regex: search, $options: 'i' } }
-        ] 
+          { fssaiNumber: { $regex: search, $options: 'i' } },
+        ],
       };
     }
 
@@ -89,7 +105,7 @@ export class VendorsService {
       vendors,
       total,
       pages: Math.ceil(total / limit),
-      currentPage: page
+      currentPage: page,
     };
   }
 
@@ -99,18 +115,24 @@ export class VendorsService {
       .populate('userId')
       .populate('restaurants')
       .exec();
-    
+
     if (!vendor) throw new NotFoundException('Vendor not found');
     return vendor;
   }
 
-  async updateStatus(id: string, status: string, reason?: string): Promise<Vendor> {
-    const vendor = await this.vendorModel.findByIdAndUpdate(
-      id,
-      { verificationStatus: status, rejectionReason: reason },
-      { new: true }
-    ).exec();
-    
+  async updateStatus(
+    id: string,
+    status: string,
+    reason?: string,
+  ): Promise<Vendor> {
+    const vendor = await this.vendorModel
+      .findByIdAndUpdate(
+        id,
+        { verificationStatus: status, rejectionReason: reason },
+        { new: true },
+      )
+      .exec();
+
     if (!vendor) throw new NotFoundException('Vendor not found');
     return vendor;
   }
@@ -118,7 +140,7 @@ export class VendorsService {
   async toggleActive(id: string): Promise<Vendor> {
     const vendor = await this.vendorModel.findById(id);
     if (!vendor) throw new NotFoundException('Vendor not found');
-    
+
     vendor.isActive = !vendor.isActive;
     return vendor.save();
   }

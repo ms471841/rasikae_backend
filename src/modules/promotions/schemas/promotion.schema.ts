@@ -37,7 +37,11 @@ export class Promotion {
   @Prop({ default: true })
   isActive: boolean;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', default: null })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Restaurant',
+    default: null,
+  })
   restaurantId?: mongoose.Types.ObjectId;
 
   @Prop()
@@ -46,7 +50,10 @@ export class Promotion {
   @Prop({ default: 0 })
   usedCount: number;
 
-  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], default: [] })
+  @Prop({
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    default: [],
+  })
   usedBy: mongoose.Types.ObjectId[];
 }
 

@@ -2,11 +2,17 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PaymentsService } from './payments.service';
 import { PaymentsController } from './payments.controller';
-import { PaymentTransaction, PaymentTransactionSchema } from './schemas/transaction.schema';
+import {
+  PaymentTransaction,
+  PaymentTransactionSchema,
+} from './schemas/transaction.schema';
 import { RazorpayModule } from './razorpay.module';
 import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { Wallet, WalletSchema } from '../wallets/schemas/wallet.schema';
-import { Transaction as WalletTransaction, TransactionSchema as WalletTransactionSchema } from '../wallets/schemas/transaction.schema';
+import {
+  Transaction as WalletTransaction,
+  TransactionSchema as WalletTransactionSchema,
+} from '../wallets/schemas/transaction.schema';
 
 @Module({
   imports: [

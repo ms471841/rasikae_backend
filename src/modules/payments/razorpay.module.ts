@@ -10,7 +10,7 @@ import Razorpay from 'razorpay';
       useFactory: (configService: ConfigService) => {
         const keyId = configService.get<string>('RAZORPAY_KEY_ID');
         const keySecret = configService.get<string>('RAZORPAY_KEY_SECRET');
-        
+
         if (!keyId || !keySecret) {
           // We provide a fallback or log a warning for local dev until keys are in .env
           console.warn('Razorpay keys missing in environment variables.');

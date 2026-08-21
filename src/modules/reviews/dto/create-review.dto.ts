@@ -1,4 +1,14 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsNumber, Min, Max, IsArray, IsMongoId } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  Min,
+  Max,
+  IsArray,
+  IsMongoId,
+} from 'class-validator';
 import { TargetType } from '../schemas/review.schema';
 
 export class CreateReviewDto {

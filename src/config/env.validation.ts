@@ -48,6 +48,22 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   AWS_S3_BUCKET_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  REDIS_URI?: string;
+
+  @IsString()
+  @IsOptional()
+  REDIS_HOST?: string;
+
+  @IsString()
+  @IsOptional()
+  REDIS_PORT?: string;
+
+  @IsString()
+  @IsOptional()
+  REDIS_PASSWORD?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

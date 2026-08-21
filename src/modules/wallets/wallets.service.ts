@@ -1,27 +1,49 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection, ClientSession } from 'mongoose';
 import { Wallet, WalletDocument } from './schemas/wallet.schema';
-import { Transaction, TransactionDocument, TransactionType, TransactionStatus } from './schemas/transaction.schema';
+import {
+  Transaction,
+  TransactionDocument,
+  TransactionType,
+  TransactionStatus,
+} from './schemas/transaction.schema';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { SettingsService } from '../settings/settings.service';
-import { BankAccount, BankAccountDocument } from '../restaurants/schemas/bank-account.schema';
-import { Restaurant, RestaurantDocument } from '../restaurants/schemas/restaurant.schema';
+import {
+  BankAccount,
+  BankAccountDocument,
+} from '../restaurants/schemas/bank-account.schema';
+import {
+  Restaurant,
+  RestaurantDocument,
+} from '../restaurants/schemas/restaurant.schema';
 import { PaymentsService } from '../payments/payments.service';
 
 @Injectable()
 export class WalletsService {
   constructor(
     @InjectModel(Wallet.name) private walletModel: Model<WalletDocument>,
-    @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
-    @InjectModel(BankAccount.name) private bankAccountModel: Model<BankAccountDocument>,
-    @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
+    @InjectModel(Transaction.name)
+    private transactionModel: Model<TransactionDocument>,
+    @InjectModel(BankAccount.name)
+    private bankAccountModel: Model<BankAccountDocument>,
+    @InjectModel(Restaurant.name)
+    private restaurantModel: Model<RestaurantDocument>,
     @InjectConnection() private readonly connection: Connection,
     private readonly settingsService: SettingsService,
     private readonly paymentsService: PaymentsService,
   ) {}
 
-  async initializeWallet(userId: string, session?: ClientSession): Promise<WalletDocument> {
+  async initializeWallet(
+    userId: string,
+    session?: ClientSession,
+  ): Promise<WalletDocument> {
     const q = this.walletModel.findOne({ userId: new Types.ObjectId(userId) });
     if (session) q.session(session);
     const existing = await q.exec();
@@ -33,7 +55,10 @@ export class WalletsService {
     return newWallet.save(session ? { session } : undefined);
   }
 
-  async getWalletByUser(userId: string, session?: ClientSession): Promise<WalletDocument> {
+  async getWalletByUser(
+    userId: string,
+    session?: ClientSession,
+  ): Promise<WalletDocument> {
     const q = this.walletModel.findOne({ userId: new Types.ObjectId(userId) });
     if (session) q.session(session);
     const wallet = await q.exec();
@@ -43,11 +68,19 @@ export class WalletsService {
 
   async getTransactionsByUser(userId: string): Promise<Transaction[]> {
     const wallet = await this.getWalletByUser(userId);
-    return this.transactionModel.find({ walletId: wallet._id }).sort({ createdAt: -1 }).exec();
+    return this.transactionModel
+      .find({ walletId: wallet._id })
+      .sort({ createdAt: -1 })
+      .exec();
   }
 
-  async initializeRestaurantWallet(restaurantId: string, session?: ClientSession): Promise<WalletDocument> {
-    const q = this.walletModel.findOne({ restaurantId: new Types.ObjectId(restaurantId) });
+  async initializeRestaurantWallet(
+    restaurantId: string,
+    session?: ClientSession,
+  ): Promise<WalletDocument> {
+    const q = this.walletModel.findOne({
+      restaurantId: new Types.ObjectId(restaurantId),
+    });
     if (session) q.session(session);
     const existing = await q.exec();
     if (existing) return existing;
@@ -59,46 +92,63 @@ export class WalletsService {
     return newWallet.save(session ? { session } : undefined);
   }
 
-  async getWalletByRestaurant(restaurantId: string, currentUser?: any, session?: ClientSession): Promise<WalletDocument> {
+  async getWalletByRestaurant(
+    restaurantId: string,
+    currentUser?: any,
+    session?: ClientSession,
+  ): Promise<WalletDocument> {
     if (currentUser && currentUser.role !== 'admin') {
       const rq = this.restaurantModel.findById(restaurantId);
       if (session) rq.session(session);
       const restaurant = await rq.exec();
-      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
-        throw new ForbiddenException('You are not authorized to access this restaurant wallet');
+      if (
+        !restaurant ||
+        restaurant.ownerId.toString() !== currentUser._id.toString()
+      ) {
+        throw new ForbiddenException(
+          'You are not authorized to access this restaurant wallet',
+        );
       }
     }
-    const q = this.walletModel.findOne({ restaurantId: new Types.ObjectId(restaurantId) });
+    const q = this.walletModel.findOne({
+      restaurantId: new Types.ObjectId(restaurantId),
+    });
     if (session) q.session(session);
     const wallet = await q.exec();
     if (!wallet) return this.initializeRestaurantWallet(restaurantId, session);
     return wallet;
   }
-  
+
   async getPlatformWallet(session?: ClientSession): Promise<WalletDocument> {
     const q = this.walletModel.findOne({ walletType: 'PLATFORM' });
     if (session) q.session(session);
     const wallet = await q.exec();
     if (wallet) return wallet;
-    
+
     const newWallet = new this.walletModel({
       walletType: 'PLATFORM',
     });
     return newWallet.save(session ? { session } : undefined);
   }
 
-  async getTransactionsByRestaurant(restaurantId: string, currentUser?: any): Promise<Transaction[]> {
+  async getTransactionsByRestaurant(
+    restaurantId: string,
+    currentUser?: any,
+  ): Promise<Transaction[]> {
     const wallet = await this.getWalletByRestaurant(restaurantId, currentUser);
-    return this.transactionModel.find({ walletId: wallet._id }).sort({ createdAt: -1 }).exec();
+    return this.transactionModel
+      .find({ walletId: wallet._id })
+      .sort({ createdAt: -1 })
+      .exec();
   }
 
   async processDeliveryEarnings(
-    userId: string, 
-    orderId: string, 
-    deliveryFee: number, 
-    totalAmountCollected: number, 
+    userId: string,
+    orderId: string,
+    deliveryFee: number,
+    totalAmountCollected: number,
     paymentMethod: string,
-    session?: ClientSession
+    session?: ClientSession,
   ): Promise<void> {
     const wallet = await this.getWalletByUser(userId, session);
 
@@ -107,45 +157,53 @@ export class WalletsService {
     wallet.totalEarned += deliveryFee;
 
     const earningTxData = {
-      walletId: wallet._id as Types.ObjectId,
+      walletId: wallet._id,
       orderId: new Types.ObjectId(orderId),
       amount: deliveryFee,
       type: TransactionType.DELIVERY_EARNING,
       description: `Delivery fee earned for Order ${orderId}`,
     };
-    await new this.transactionModel(earningTxData).save(session ? { session } : undefined);
+    await new this.transactionModel(earningTxData).save(
+      session ? { session } : undefined,
+    );
 
     // COD injection
     if (paymentMethod === 'COD') {
       wallet.cashInHand += totalAmountCollected;
 
       const codTxData = {
-        walletId: wallet._id as Types.ObjectId,
+        walletId: wallet._id,
         orderId: new Types.ObjectId(orderId),
         amount: totalAmountCollected,
         type: TransactionType.CASH_COLLECTED,
         description: `Cash collected for COD Order ${orderId}`,
       };
-      await new this.transactionModel(codTxData).save(session ? { session } : undefined);
+      await new this.transactionModel(codTxData).save(
+        session ? { session } : undefined,
+      );
     }
 
     await wallet.save(session ? { session } : undefined);
   }
 
   async processRestaurantEarnings(
-    restaurantId: string, 
-    orderId: string, 
-    subTotal: number, 
-    tax: number = 0, 
-    cgst: number = 0, 
+    restaurantId: string,
+    orderId: string,
+    subTotal: number,
+    tax: number = 0,
+    cgst: number = 0,
     sgst: number = 0,
-    session?: ClientSession
+    session?: ClientSession,
   ): Promise<void> {
-    const wallet = await this.getWalletByRestaurant(restaurantId, undefined, session);
+    const wallet = await this.getWalletByRestaurant(
+      restaurantId,
+      undefined,
+      session,
+    );
     const settings = await this.settingsService.getSettings();
 
     // Platform Commission logic (Dynamic from Settings)
-    const commissionRate = settings.platformCommissionPercentage || 0.10;
+    const commissionRate = settings.platformCommissionPercentage || 0.1;
     const platformCommission = Math.round(subTotal * commissionRate);
     const finalRestaurantEarning = subTotal - platformCommission;
 
@@ -155,35 +213,39 @@ export class WalletsService {
     // Platform Balance Injection (Commission + Taxes)
     const platformWallet = await this.getPlatformWallet(session);
     const totalPlatformInjection = platformCommission + tax; // We assume the platform holds the tax for filing
-    
+
     platformWallet.availableBalance += totalPlatformInjection;
     platformWallet.totalEarned += totalPlatformInjection;
     await platformWallet.save(session ? { session } : undefined);
 
     // Log the restaurant earning
     const earningTxData = {
-      walletId: wallet._id as Types.ObjectId,
+      walletId: wallet._id,
       orderId: new Types.ObjectId(orderId),
       amount: finalRestaurantEarning,
       type: TransactionType.RESTAURANT_EARNING,
       description: `Revenue from Order ${orderId}`,
     };
-    await new this.transactionModel(earningTxData).save(session ? { session } : undefined);
+    await new this.transactionModel(earningTxData).save(
+      session ? { session } : undefined,
+    );
 
     // Log the platform revenue (Commission)
     const commissionTxData = {
-      walletId: platformWallet._id as Types.ObjectId,
+      walletId: platformWallet._id,
       orderId: new Types.ObjectId(orderId),
       amount: platformCommission,
       type: TransactionType.PLATFORM_COMMISSION,
       description: `${(commissionRate * 100).toFixed(1)}% Platform Commission from Order ${orderId}`,
     };
-    await new this.transactionModel(commissionTxData).save(session ? { session } : undefined);
+    await new this.transactionModel(commissionTxData).save(
+      session ? { session } : undefined,
+    );
 
     // Log the platform tax collection (Split into CGST & SGST)
     if (cgst > 0) {
       await new this.transactionModel({
-        walletId: platformWallet._id as Types.ObjectId,
+        walletId: platformWallet._id,
         orderId: new Types.ObjectId(orderId),
         amount: cgst,
         type: TransactionType.CGST_COLLECTED,
@@ -192,18 +254,18 @@ export class WalletsService {
     }
     if (sgst > 0) {
       await new this.transactionModel({
-        walletId: platformWallet._id as Types.ObjectId,
+        walletId: platformWallet._id,
         orderId: new Types.ObjectId(orderId),
         amount: sgst,
         type: TransactionType.SGST_COLLECTED,
         description: `SGST (2.5%) Collected for Order ${orderId}`,
       }).save(session ? { session } : undefined);
     }
-    
+
     // Legacy support: also log total tax if cgst/sgst are not provided but tax is
     if (tax > 0 && cgst === 0 && sgst === 0) {
       await new this.transactionModel({
-        walletId: platformWallet._id as Types.ObjectId,
+        walletId: platformWallet._id,
         orderId: new Types.ObjectId(orderId),
         amount: tax,
         type: TransactionType.TAX_COLLECTED,
@@ -214,59 +276,106 @@ export class WalletsService {
     await wallet.save(session ? { session } : undefined);
   }
 
-  async creditWallet(userId: string, amount: number, description: string, session?: ClientSession): Promise<void> {
+  async creditWallet(
+    userId: string,
+    amount: number,
+    description: string,
+    session?: ClientSession,
+  ): Promise<void> {
     const wallet = await this.getWalletByUser(userId, session);
     wallet.availableBalance += amount;
-    
+
     const txData = {
-      walletId: wallet._id as Types.ObjectId,
+      walletId: wallet._id,
       amount: amount,
       type: 'WALLET_TOPUP',
       description: description,
     };
-    await new this.transactionModel(txData).save(session ? { session } : undefined);
+    await new this.transactionModel(txData).save(
+      session ? { session } : undefined,
+    );
     await wallet.save(session ? { session } : undefined);
   }
 
-  async requestWithdrawal(restaurantId: string, withdrawDto: WithdrawDto, currentUser?: any, session?: ClientSession): Promise<WalletDocument> {
+  async requestWithdrawal(
+    restaurantId: string,
+    withdrawDto: WithdrawDto,
+    currentUser?: any,
+    session?: ClientSession,
+  ): Promise<WalletDocument> {
     const { amount, description } = withdrawDto;
-    const wallet = await this.getWalletByRestaurant(restaurantId, currentUser, session);
 
-    if (wallet.availableBalance < amount) {
+    if (currentUser && currentUser.role !== 'admin') {
+      const rq = this.restaurantModel.findById(restaurantId);
+      if (session) rq.session(session);
+      const restaurant = await rq.exec();
+      if (
+        !restaurant ||
+        restaurant.ownerId.toString() !== currentUser._id.toString()
+      ) {
+        throw new ForbiddenException(
+          'You are not authorized to request withdrawals for this restaurant',
+        );
+      }
+    }
+
+    // Ensure wallet exists
+    await this.getWalletByRestaurant(restaurantId, undefined, session);
+
+    // Atomic deduction: only succeeds if availableBalance >= amount
+    const updateQuery = this.walletModel.findOneAndUpdate(
+      {
+        restaurantId: new Types.ObjectId(restaurantId),
+        availableBalance: { $gte: amount },
+      },
+      {
+        $inc: { availableBalance: -amount },
+      },
+      { returnDocument: 'after', session },
+    );
+    const updatedWallet = await updateQuery.exec();
+
+    if (!updatedWallet) {
       throw new BadRequestException('Insufficient balance in wallet.');
     }
 
-    // Deduct balance
-    wallet.availableBalance -= amount;
-
     // Create transaction log
     const txData = {
-      walletId: wallet._id as Types.ObjectId,
+      walletId: updatedWallet._id,
       amount: amount,
       type: TransactionType.WITHDRAWAL,
       status: TransactionStatus.PENDING,
-      description: description || `Withdrawal request for restaurant ${restaurantId}`,
+      description:
+        description || `Withdrawal request for restaurant ${restaurantId}`,
     };
 
-    await new this.transactionModel(txData).save(session ? { session } : undefined);
-    return wallet.save(session ? { session } : undefined);
+    await new this.transactionModel(txData).save(
+      session ? { session } : undefined,
+    );
+    return updatedWallet;
   }
 
   async getPendingWithdrawals(): Promise<Transaction[]> {
-    return this.transactionModel.find({
-      type: TransactionType.WITHDRAWAL,
-      status: TransactionStatus.PENDING,
-    })
-    .populate({
-      path: 'walletId',
-      populate: { path: 'restaurantId', select: 'name' }
-    })
-    .sort({ createdAt: 1 })
-    .exec();
+    return this.transactionModel
+      .find({
+        type: TransactionType.WITHDRAWAL,
+        status: TransactionStatus.PENDING,
+      })
+      .populate({
+        path: 'walletId',
+        populate: { path: 'restaurantId', select: 'name' },
+      })
+      .sort({ createdAt: 1 })
+      .exec();
   }
 
-  async completeWithdrawal(transactionId: string): Promise<TransactionDocument> {
-    const transaction = await this.transactionModel.findById(transactionId).populate('walletId').exec();
+  async completeWithdrawal(
+    transactionId: string,
+  ): Promise<TransactionDocument> {
+    const transaction = await this.transactionModel
+      .findById(transactionId)
+      .populate('walletId')
+      .exec();
     if (!transaction) {
       throw new NotFoundException('Transaction not found');
     }
@@ -324,12 +433,17 @@ export class WalletsService {
     // --- END RAZORPAYX PAYOUT LOGIC ---
     */
 
-    transaction.status = TransactionStatus.COMPLETED as any;
+    transaction.status = TransactionStatus.COMPLETED;
     return transaction.save();
   }
 
-  async rejectWithdrawal(transactionId: string, reason?: string): Promise<TransactionDocument> {
-    const transaction = await this.transactionModel.findById(transactionId).exec();
+  async rejectWithdrawal(
+    transactionId: string,
+    reason?: string,
+  ): Promise<TransactionDocument> {
+    const transaction = await this.transactionModel
+      .findById(transactionId)
+      .exec();
     if (!transaction) {
       throw new NotFoundException('Transaction not found');
     }
@@ -352,7 +466,8 @@ export class WalletsService {
   }
 
   async findAllWallets(): Promise<Wallet[]> {
-    return this.walletModel.find()
+    return this.walletModel
+      .find()
       .populate('userId', 'name email phone')
       .populate('restaurantId', 'name address')
       .sort({ availableBalance: -1 })
@@ -360,7 +475,8 @@ export class WalletsService {
   }
 
   async findAllTransactions(): Promise<Transaction[]> {
-    return this.transactionModel.find()
+    return this.transactionModel
+      .find()
       .sort({ createdAt: -1 })
       .limit(100)
       .exec();
@@ -395,12 +511,15 @@ export class WalletsService {
   }
 
   async findTransactionsByWallet(walletId: string): Promise<Transaction[]> {
-    return this.transactionModel.find({ walletId: new Types.ObjectId(walletId) })
+    return this.transactionModel
+      .find({ walletId: new Types.ObjectId(walletId) })
       .sort({ createdAt: -1 })
       .exec();
   }
 
-  async settleBatch(walletIds: string[]): Promise<{ success: string[], failed: string[] }> {
+  async settleBatch(
+    walletIds: string[],
+  ): Promise<{ success: string[]; failed: string[] }> {
     const success: string[] = [];
     const failed: string[] = [];
 

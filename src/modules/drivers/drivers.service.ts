@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Inject,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import * as admin from 'firebase-admin';
@@ -29,11 +35,22 @@ export class DriversService {
     return !!driver;
   }
 
-  async create(createDriverDto: CreateDriverDto, currentUser?: any): Promise<Driver> {
-    if (currentUser && currentUser.role !== 'admin' && currentUser._id.toString() !== createDriverDto.userId) {
-      throw new ForbiddenException('You are not authorized to register as a driver for this user');
+  async create(
+    createDriverDto: CreateDriverDto,
+    currentUser?: any,
+  ): Promise<Driver> {
+    if (
+      currentUser &&
+      currentUser.role !== 'admin' &&
+      currentUser._id.toString() !== createDriverDto.userId
+    ) {
+      throw new ForbiddenException(
+        'You are not authorized to register as a driver for this user',
+      );
     }
-    const existingDriver = await this.driverModel.findOne({ userId: createDriverDto.userId }).exec();
+    const existingDriver = await this.driverModel
+      .findOne({ userId: createDriverDto.userId })
+      .exec();
     if (existingDriver) {
       throw new BadRequestException('User is already registered as a driver');
     }
@@ -61,10 +78,14 @@ export class DriversService {
       });
     } catch (error) {
       if (error.code === 'auth/email-already-exists') {
-        throw new BadRequestException('A user with this email already exists in Firebase.');
+        throw new BadRequestException(
+          'A user with this email already exists in Firebase.',
+        );
       }
       if (error.code === 'auth/phone-number-already-exists') {
-        throw new BadRequestException('A user with this phone number already exists in Firebase.');
+        throw new BadRequestException(
+          'A user with this phone number already exists in Firebase.',
+        );
       }
       throw new BadRequestException(`Firebase Error: ${error.message}`);
     }
@@ -113,34 +134,53 @@ export class DriversService {
   }
 
   async findAll(): Promise<Driver[]> {
-    return this.driverModel.find().populate('userId', 'name email phone').exec();
+    return this.driverModel
+      .find()
+      .populate('userId', 'name email phone')
+      .exec();
   }
 
   async findAvailable(): Promise<Driver[]> {
-    return this.driverModel.find({ isAvailable: true }).populate('userId', 'name phone').exec();
+    return this.driverModel
+      .find({ isAvailable: true })
+      .populate('userId', 'name phone')
+      .exec();
   }
 
   async getFleet(): Promise<Driver[]> {
-    return this.driverModel.find({ currentLocation: { $exists: true } }).populate('userId', 'name phone').exec();
+    return this.driverModel
+      .find({ currentLocation: { $exists: true } })
+      .populate('userId', 'name phone')
+      .exec();
   }
 
-  async findNearbyAvailable(lng: number, lat: number, maxDistance: number): Promise<Driver[]> {
-    return this.driverModel.find({
-      isAvailable: true,
-      currentLocation: {
-        $nearSphere: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [lng, lat]
+  async findNearbyAvailable(
+    lng: number,
+    lat: number,
+    maxDistance: number,
+  ): Promise<Driver[]> {
+    return this.driverModel
+      .find({
+        isAvailable: true,
+        currentLocation: {
+          $nearSphere: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [lng, lat],
+            },
+            $maxDistance: maxDistance,
           },
-          $maxDistance: maxDistance
-        }
-      }
-    }).populate('userId', 'name phone').exec();
+        },
+      })
+      .populate('userId', 'name phone')
+      .exec();
   }
 
   async findOne(id: string): Promise<Driver> {
-    const driver = await this.driverModel.findById(id).populate('userId', 'name email phone').exec();
+    const driver = await this.driverModel
+      .findById(id)
+      .populate('userId', 'name email phone')
+      .exec();
     if (!driver) {
       throw new NotFoundException(`Driver with ID ${id} not found`);
     }
@@ -148,28 +188,40 @@ export class DriversService {
   }
 
   async findByUserId(userId: string): Promise<DriverDocument> {
-    const driver = await this.driverModel.findOne({ userId: new mongoose.Types.ObjectId(userId) }).exec();
+    const driver = await this.driverModel
+      .findOne({ userId: new mongoose.Types.ObjectId(userId) })
+      .exec();
     if (!driver) {
-      throw new NotFoundException(`Driver profile not found for user ID ${userId}`);
+      throw new NotFoundException(
+        `Driver profile not found for user ID ${userId}`,
+      );
     }
     return driver;
   }
 
-  async updateStatus(id: string, updateDriverStatusDto: UpdateDriverStatusDto, currentUser?: any): Promise<Driver> {
+  async updateStatus(
+    id: string,
+    updateDriverStatusDto: UpdateDriverStatusDto,
+    currentUser?: any,
+  ): Promise<Driver> {
     if (currentUser && currentUser.role !== 'admin') {
       const driverObj = await this.driverModel.findById(id).exec();
       if (!driverObj) {
         throw new NotFoundException(`Driver with ID ${id} not found`);
       }
       if (driverObj.userId.toString() !== currentUser._id.toString()) {
-        throw new ForbiddenException('You are not authorized to update this driver status');
+        throw new ForbiddenException(
+          'You are not authorized to update this driver status',
+        );
       }
     }
-    const driver = await this.driverModel.findByIdAndUpdate(
-      id,
-      { isAvailable: updateDriverStatusDto.isAvailable },
-      { returnDocument: 'after' }
-    ).exec();
+    const driver = await this.driverModel
+      .findByIdAndUpdate(
+        id,
+        { isAvailable: updateDriverStatusDto.isAvailable },
+        { returnDocument: 'after' },
+      )
+      .exec();
 
     if (!driver) {
       throw new NotFoundException(`Driver with ID ${id} not found`);
@@ -177,26 +229,34 @@ export class DriversService {
     return driver;
   }
 
-  async updateLocation(id: string, updateLocationDto: UpdateLocationDto, currentUser?: any): Promise<Driver> {
+  async updateLocation(
+    id: string,
+    updateLocationDto: UpdateLocationDto,
+    currentUser?: any,
+  ): Promise<Driver> {
     if (currentUser && currentUser.role !== 'admin') {
       const driverObj = await this.driverModel.findById(id).exec();
       if (!driverObj) {
         throw new NotFoundException(`Driver with ID ${id} not found`);
       }
       if (driverObj.userId.toString() !== currentUser._id.toString()) {
-        throw new ForbiddenException('You are not authorized to update this driver location');
+        throw new ForbiddenException(
+          'You are not authorized to update this driver location',
+        );
       }
     }
-    const driver = await this.driverModel.findByIdAndUpdate(
-      id,
-      { 
-        currentLocation: {
-          type: 'Point',
-          coordinates: updateLocationDto.coordinates
-        }
-      },
-      { returnDocument: 'after' }
-    ).exec();
+    const driver = await this.driverModel
+      .findByIdAndUpdate(
+        id,
+        {
+          currentLocation: {
+            type: 'Point',
+            coordinates: updateLocationDto.coordinates,
+          },
+        },
+        { returnDocument: 'after' },
+      )
+      .exec();
 
     if (!driver) {
       throw new NotFoundException(`Driver with ID ${id} not found`);
@@ -208,7 +268,9 @@ export class DriversService {
     const user = await this.usersService.getProfile(firebaseUid);
     const driver = await this.driverModel.findOne({ userId: user._id }).exec();
     if (!driver) {
-      throw new NotFoundException(`Driver profile not found for firebase UID ${firebaseUid}`);
+      throw new NotFoundException(
+        `Driver profile not found for firebase UID ${firebaseUid}`,
+      );
     }
     return driver;
   }

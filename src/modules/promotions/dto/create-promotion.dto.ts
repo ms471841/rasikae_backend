@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, IsEnum, IsDateString, IsMongoId } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  IsBoolean,
+  IsEnum,
+  IsDateString,
+  IsMongoId,
+} from 'class-validator';
 import { DiscountType } from '../schemas/promotion.schema';
 
 export class CreatePromotionDto {

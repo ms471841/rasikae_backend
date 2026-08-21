@@ -25,24 +25,27 @@ export class UsersService {
     @Inject(FIREBASE_APP) private firebaseApp: admin.app.App,
   ) {}
 
-  async syncUser(firebaseUid: string, dto: CreateUserDto, email?: string, phone?: string): Promise<User> {
+  async syncUser(
+    firebaseUid: string,
+    dto: CreateUserDto,
+    email?: string,
+    phone?: string,
+  ): Promise<User> {
     let user = await this.userModel.findOne({ firebaseUid }).exec();
 
     if (!user) {
       user = new this.userModel({
         firebaseUid,
-        email,
-        phone,
-        ...dto,
+        name: dto.name,
+        email: email || dto.email,
+        phone: phone || dto.phone,
+        avatarUrl: dto.avatarUrl,
+        preference: dto.preference,
+        role: 'customer',
       });
       await user.save();
-
-      // If new user is a vendor, initialize vendor profile
-      if (user.role === 'vendor') {
-        await this.initializeVendorProfile(user);
-      }
     }
-    
+
     return user;
   }
 
@@ -57,23 +60,32 @@ export class UsersService {
   async findByPhone(phone: string): Promise<UserDocument | null> {
     const cleanPhone = phone.trim();
     const digitsOnly = cleanPhone.replace(/\D/g, '');
-    const last10Digits = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+    const last10Digits =
+      digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
 
-    return this.userModel.findOne({
-      $or: [
-        { phone: cleanPhone },
-        { phone: new RegExp(last10Digits, 'i') },
-      ]
-    }).exec();
+    return this.userModel
+      .findOne({
+        $or: [{ phone: cleanPhone }, { phone: new RegExp(last10Digits, 'i') }],
+      })
+      .exec();
   }
 
   async updateProfile(firebaseUid: string, dto: UpdateUserDto): Promise<User> {
-    const user = await this.userModel.findOneAndUpdate(
-      { firebaseUid },
-      { $set: dto },
-      { returnDocument: 'after' },
-    ).exec();
-    
+    const updateData: Partial<User> = {};
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.email !== undefined) updateData.email = dto.email;
+    if (dto.phone !== undefined) updateData.phone = dto.phone;
+    if (dto.avatarUrl !== undefined) updateData.avatarUrl = dto.avatarUrl;
+    if (dto.preference !== undefined) updateData.preference = dto.preference;
+
+    const user = await this.userModel
+      .findOneAndUpdate(
+        { firebaseUid },
+        { $set: updateData },
+        { returnDocument: 'after' },
+      )
+      .exec();
+
     if (!user) {
       throw new NotFoundException('User profile not found');
     }
@@ -82,7 +94,7 @@ export class UsersService {
 
   async updateFcmToken(uid: string, dto: UpdateFcmTokenDto): Promise<User> {
     const { token, action } = dto;
-    
+
     let updateQuery;
     if (action === FcmAction.ADD) {
       updateQuery = { $addToSet: { fcmTokens: token } };
@@ -90,15 +102,13 @@ export class UsersService {
       updateQuery = { $pull: { fcmTokens: token } };
     }
 
-    const filter = Types.ObjectId.isValid(uid) 
+    const filter = Types.ObjectId.isValid(uid)
       ? { $or: [{ _id: new Types.ObjectId(uid) }, { firebaseUid: uid }] }
       : { firebaseUid: uid };
 
-    const user = await this.userModel.findOneAndUpdate(
-      filter,
-      updateQuery,
-      { returnDocument: 'after' },
-    ).exec();
+    const user = await this.userModel
+      .findOneAndUpdate(filter, updateQuery, { returnDocument: 'after' })
+      .exec();
 
     if (!user) {
       throw new NotFoundException('User profile not found');
@@ -106,16 +116,15 @@ export class UsersService {
     return user;
   }
 
-
   async getTokens(userIds: string[]): Promise<string[]> {
-    const users = await this.userModel.find({ 
-      $or: [
-        { _id: { $in: userIds } },
-        { firebaseUid: { $in: userIds } }
-      ]
-    }).select('fcmTokens').exec();
-    
-    return users.flatMap(u => u.fcmTokens);
+    const users = await this.userModel
+      .find({
+        $or: [{ _id: { $in: userIds } }, { firebaseUid: { $in: userIds } }],
+      })
+      .select('fcmTokens')
+      .exec();
+
+    return users.flatMap((u) => u.fcmTokens);
   }
 
   async deleteAccount(firebaseUid: string): Promise<void> {
@@ -128,7 +137,9 @@ export class UsersService {
 
     // 1. Delete associated data
     await Promise.all([
-      this.addressModel.deleteMany({ userId: new Types.ObjectId(userIdStr) }).exec(),
+      this.addressModel
+        .deleteMany({ userId: new Types.ObjectId(userIdStr) })
+        .exec(),
       this.cartModel.findOneAndDelete({ userId: userIdStr }).exec(),
     ]);
 
@@ -149,7 +160,11 @@ export class UsersService {
     return user.save();
   }
 
-  async findAllAdmin(page: number = 1, limit: number = 20, search?: string): Promise<any> {
+  async findAllAdmin(
+    page: number = 1,
+    limit: number = 20,
+    search?: string,
+  ): Promise<any> {
     const skip = (page - 1) * limit;
     const query: any = {};
 
@@ -158,17 +173,18 @@ export class UsersService {
       query.$or = [
         { name: searchRegex },
         { email: searchRegex },
-        { phone: searchRegex }
+        { phone: searchRegex },
       ];
     }
 
     const [data, totalItems] = await Promise.all([
-      this.userModel.find(query)
+      this.userModel
+        .find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.userModel.countDocuments(query).exec()
+      this.userModel.countDocuments(query).exec(),
     ]);
 
     const totalPages = Math.ceil(totalItems / limit);
@@ -177,16 +193,18 @@ export class UsersService {
       data,
       totalItems,
       totalPages,
-      currentPage: page
+      currentPage: page,
     };
   }
 
   async updateStatus(uid: string, role: string): Promise<User> {
-    const user = await this.userModel.findOneAndUpdate(
-      { $or: [{ _id: new Types.ObjectId(uid) }, { firebaseUid: uid }] },
-      { $set: { role } },
-      { returnDocument: 'after' }
-    ).exec();
+    const user = await this.userModel
+      .findOneAndUpdate(
+        { $or: [{ _id: new Types.ObjectId(uid) }, { firebaseUid: uid }] },
+        { $set: { role } },
+        { returnDocument: 'after' },
+      )
+      .exec();
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -201,7 +219,9 @@ export class UsersService {
   }
 
   private async initializeVendorProfile(user: UserDocument) {
-    const existingVendor = await this.vendorModel.findOne({ userId: user._id }).exec();
+    const existingVendor = await this.vendorModel
+      .findOne({ userId: user._id })
+      .exec();
     if (!existingVendor) {
       await new this.vendorModel({
         userId: user._id,
@@ -210,100 +230,114 @@ export class UsersService {
       }).save();
     }
   }
-  
+
   async toggleUserActive(id: string): Promise<User> {
     const user = await this.userModel.findById(id).exec();
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    
+
     user.isActive = !user.isActive;
-    
+
     // Sync with Firebase Auth
     try {
       await admin.auth().updateUser(user.firebaseUid, {
-        disabled: !user.isActive
+        disabled: !user.isActive,
       });
     } catch (err) {
       console.error('Firebase Auth sync failed:', err);
       // We continue even if firebase fails, but the database will be out of sync.
       // Ideally we should handle this, but for now we'll just log it.
     }
-    
+
     return user.save();
   }
 
-  async incrementUserStats(userId: string | Types.ObjectId, amountPaise: number): Promise<void> {
+  async incrementUserStats(
+    userId: string | Types.ObjectId,
+    amountPaise: number,
+  ): Promise<void> {
     const id = typeof userId === 'string' ? new Types.ObjectId(userId) : userId;
-    await this.userModel.updateOne(
-      { _id: id },
-      { 
-        $inc: { 
-          totalOrders: 1, 
-          ltv: amountPaise 
+    await this.userModel
+      .updateOne(
+        { _id: id },
+        {
+          $inc: {
+            totalOrders: 1,
+            ltv: amountPaise,
+          },
+          $set: {
+            lastOrderDate: new Date(),
+          },
         },
-        $set: { 
-          lastOrderDate: new Date() 
-        }
-      }
-    ).exec();
+      )
+      .exec();
   }
 
   async syncAllUserStats(): Promise<any> {
-    const aggregation = await this.orderModel.aggregate([
-      { $match: { status: 'DELIVERED' } },
-      {
-        $group: {
-          _id: '$userId',
-          totalOrders: { $sum: 1 },
-          ltv: { $sum: '$totalAmount' },
-          lastOrderDate: { $max: '$createdAt' }
-        }
-      }
-    ]).exec();
+    const aggregation = await this.orderModel
+      .aggregate([
+        { $match: { status: 'DELIVERED' } },
+        {
+          $group: {
+            _id: '$userId',
+            totalOrders: { $sum: 1 },
+            ltv: { $sum: '$totalAmount' },
+            lastOrderDate: { $max: '$createdAt' },
+          },
+        },
+      ])
+      .exec();
 
-    const updates = aggregation.map(stats => 
-      this.userModel.updateOne(
-        { _id: stats._id },
-        { 
-          $set: { 
-            totalOrders: stats.totalOrders,
-            ltv: stats.ltv,
-            lastOrderDate: stats.lastOrderDate
-          } 
-        }
-      ).exec()
+    const updates = aggregation.map((stats) =>
+      this.userModel
+        .updateOne(
+          { _id: stats._id },
+          {
+            $set: {
+              totalOrders: stats.totalOrders,
+              ltv: stats.ltv,
+              lastOrderDate: stats.lastOrderDate,
+            },
+          },
+        )
+        .exec(),
     );
 
     await Promise.all(updates);
     return { updatedCount: aggregation.length };
   }
 
-  async searchUsers(query: string, page: number = 1, limit: number = 10): Promise<any> {
+  async searchUsers(
+    query: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<any> {
     const skip = (page - 1) * limit;
     const searchRegex = new RegExp(escapeRegex(query), 'i');
     const filter = {
       $or: [
         { name: searchRegex },
         { email: searchRegex },
-        { phone: searchRegex }
-      ]
+        { phone: searchRegex },
+      ],
     };
 
     const [data, totalItems] = await Promise.all([
-      this.userModel.find(filter)
+      this.userModel
+        .find(filter)
         .sort({ name: 1 })
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.userModel.countDocuments(filter).exec()
+      this.userModel.countDocuments(filter).exec(),
     ]);
 
     return {
       data,
       totalItems,
       totalPages: Math.ceil(totalItems / limit),
-      currentPage: page
+      currentPage: page,
     };
   }
 }

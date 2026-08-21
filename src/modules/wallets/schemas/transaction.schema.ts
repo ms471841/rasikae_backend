@@ -38,7 +38,12 @@ export class Transaction {
   @Prop({ type: String, enum: TransactionType, required: true })
   type: string;
 
-  @Prop({ type: String, enum: TransactionStatus, required: true, default: TransactionStatus.COMPLETED })
+  @Prop({
+    type: String,
+    enum: TransactionStatus,
+    required: true,
+    default: TransactionStatus.COMPLETED,
+  })
   status: string;
 
   @Prop({ required: true })
@@ -52,3 +57,7 @@ export class Transaction {
 }
 
 export const TransactionSchema = SchemaFactory.createForClass(Transaction);
+
+TransactionSchema.index({ walletId: 1, createdAt: -1 });
+TransactionSchema.index({ type: 1, status: 1, createdAt: -1 });
+TransactionSchema.index({ razorpayPayoutId: 1 }, { sparse: true });

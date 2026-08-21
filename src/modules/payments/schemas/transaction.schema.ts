@@ -48,4 +48,12 @@ export class PaymentTransaction {
   metadata?: any;
 }
 
-export const PaymentTransactionSchema = SchemaFactory.createForClass(PaymentTransaction);
+export const PaymentTransactionSchema =
+  SchemaFactory.createForClass(PaymentTransaction);
+
+PaymentTransactionSchema.index(
+  { razorpayOrderId: 1 },
+  { unique: true, sparse: true },
+);
+PaymentTransactionSchema.index({ userId: 1, createdAt: -1 });
+PaymentTransactionSchema.index({ status: 1, createdAt: -1 });

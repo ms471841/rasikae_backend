@@ -31,10 +31,18 @@ export class CartItem {
   @Prop({ type: mongoose.Schema.Types.ObjectId, auto: true })
   _id: mongoose.Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MenuItem',
+    required: true,
+  })
   menuItemId: mongoose.Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Restaurant',
+    required: true,
+  })
   restaurantId: mongoose.Types.ObjectId;
 
   @Prop({ required: true, min: 1 })
@@ -68,3 +76,5 @@ export class Cart {
 }
 
 export const CartSchema = SchemaFactory.createForClass(Cart);
+
+CartSchema.index({ userId: 1 }, { unique: true });

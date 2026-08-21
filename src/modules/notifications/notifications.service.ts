@@ -67,7 +67,9 @@ export class NotificationsService {
 
     try {
       const response = await this.firebaseApp.messaging().send(message);
-      this.logger.log(`Successfully sent message to topic ${topic}: ${response}`);
+      this.logger.log(
+        `Successfully sent message to topic ${topic}: ${response}`,
+      );
     } catch (error) {
       this.logger.error(`Error sending message to topic ${topic}:`, error);
     }
@@ -101,15 +103,21 @@ export class NotificationsService {
     };
 
     try {
-      const response = await this.firebaseApp.messaging().sendEachForMulticast(message);
-      this.logger.log(`Successfully sent multicast message. Success count: ${response.successCount}`);
+      const response = await this.firebaseApp
+        .messaging()
+        .sendEachForMulticast(message);
+      this.logger.log(
+        `Successfully sent multicast message. Success count: ${response.successCount}`,
+      );
 
       if (response.failureCount > 0) {
         const failedTokens: string[] = [];
         response.responses.forEach((resp, idx) => {
           if (!resp.success) {
             const errorCode = resp.error?.code;
-            this.logger.error(`Token at index ${idx} failed: ${resp.error?.message} (${errorCode})`);
+            this.logger.error(
+              `Token at index ${idx} failed: ${resp.error?.message} (${errorCode})`,
+            );
             if (
               errorCode === 'messaging/registration-token-not-registered' ||
               errorCode === 'messaging/invalid-registration-token'
@@ -120,7 +128,9 @@ export class NotificationsService {
         });
 
         if (failedTokens.length > 0 && userId) {
-          this.logger.log(`Cleaning up ${failedTokens.length} stale tokens for user ${userId}`);
+          this.logger.log(
+            `Cleaning up ${failedTokens.length} stale tokens for user ${userId}`,
+          );
           for (const token of failedTokens) {
             await this.usersService.updateFcmToken(userId, {
               token,

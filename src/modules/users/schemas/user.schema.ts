@@ -23,13 +23,19 @@ export class User {
   @Prop()
   preference?: string;
 
-  @Prop({ default: 'customer', enum: ['customer', 'admin', 'vendor', 'driver'] })
+  @Prop({
+    default: 'customer',
+    enum: ['customer', 'admin', 'vendor', 'driver'],
+  })
   role: string;
 
   @Prop({ type: [String], default: [] })
   fcmTokens: string[];
 
-  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant' }], default: [] })
+  @Prop({
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant' }],
+    default: [],
+  })
   favorites: mongoose.Types.ObjectId[];
 
   @Prop({ default: 0 })
@@ -49,3 +55,8 @@ export class User {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+UserSchema.index({ email: 1 }, { sparse: true });
+UserSchema.index({ phone: 1 }, { sparse: true });
+UserSchema.index({ role: 1 });
+UserSchema.index({ createdAt: -1 });

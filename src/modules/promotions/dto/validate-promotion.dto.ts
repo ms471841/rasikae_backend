@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsNumber, IsMongoId, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  IsMongoId,
+  IsOptional,
+} from 'class-validator';
 
 export class ValidatePromotionDto {
   @IsString()

@@ -1,4 +1,11 @@
-import { IsMongoId, IsNotEmpty, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsMongoId,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class AddressDto {
@@ -44,4 +51,8 @@ export class CheckoutDto {
   @IsString()
   @IsNotEmpty()
   idempotencyKey: string;
+
+  @IsString()
+  @IsOptional()
+  couponCode?: string;
 }

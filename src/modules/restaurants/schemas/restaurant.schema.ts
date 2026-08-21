@@ -46,10 +46,16 @@ export class Restaurant {
   @Prop({ type: [String], default: [] })
   coverImages?: string[];
 
-  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], default: [] })
+  @Prop({
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
+    default: [],
+  })
   categories?: mongoose.Types.ObjectId[];
 
-  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Cuisine' }], default: [] })
+  @Prop({
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Cuisine' }],
+    default: [],
+  })
   cuisines?: mongoose.Types.ObjectId[];
 
   @Prop()
@@ -106,3 +112,6 @@ export class Restaurant {
 }
 
 export const RestaurantSchema = SchemaFactory.createForClass(Restaurant);
+
+RestaurantSchema.index({ ownerId: 1 });
+RestaurantSchema.index({ status: 1, isPublished: 1, rating: -1 });

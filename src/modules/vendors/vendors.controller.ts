@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { VendorsService } from './vendors.service';
 import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -25,7 +34,15 @@ export class VendorsController {
    */
   @Post('admin/create')
   @Roles('admin')
-  create(@Body() data: { name: string; email: string; phone: string; businessName: string }) {
+  create(
+    @Body()
+    data: {
+      name: string;
+      email: string;
+      phone: string;
+      businessName: string;
+    },
+  ) {
     return this.vendorsService.createVendor(data);
   }
 
@@ -53,7 +70,7 @@ export class VendorsController {
     return this.vendorsService.findAll(
       parseInt(page || '1'),
       parseInt(limit || '20'),
-      search
+      search,
     );
   }
 

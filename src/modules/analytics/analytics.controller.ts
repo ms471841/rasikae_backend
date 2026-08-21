@@ -51,7 +51,13 @@ export class AnalyticsController {
    */
   @Get('restaurant/:restaurantId')
   @UseGuards(FirebaseAuthGuard)
-  getRestaurantAnalytics(@CurrUser() user: any, @Param('restaurantId') restaurantId: string) {
-    return this.analyticsService.getRestaurantDashboardStats(restaurantId, user);
+  getRestaurantAnalytics(
+    @CurrUser() user: any,
+    @Param('restaurantId') restaurantId: string,
+  ) {
+    return this.analyticsService.getRestaurantDashboardStats(
+      restaurantId,
+      user,
+    );
   }
 }

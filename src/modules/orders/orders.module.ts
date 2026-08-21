@@ -4,9 +4,18 @@ import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { InvoicesService } from './invoices.service';
 import { Order, OrderSchema } from './schemas/order.schema';
-import { MenuItem, MenuItemSchema } from '../menu-items/schemas/menu-item.schema';
-import { Restaurant, RestaurantSchema } from '../restaurants/schemas/restaurant.schema';
-import { PaymentTransaction, PaymentTransactionSchema } from '../payments/schemas/transaction.schema';
+import {
+  MenuItem,
+  MenuItemSchema,
+} from '../menu-items/schemas/menu-item.schema';
+import {
+  Restaurant,
+  RestaurantSchema,
+} from '../restaurants/schemas/restaurant.schema';
+import {
+  PaymentTransaction,
+  PaymentTransactionSchema,
+} from '../payments/schemas/transaction.schema';
 import { CartsModule } from '../carts/carts.module';
 import { DriversModule } from '../drivers/drivers.module';
 import { WalletsModule } from '../wallets/wallets.module';
@@ -14,6 +23,7 @@ import { SocketsModule } from '../sockets/sockets.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { UsersModule } from '../users/users.module';
 import { FirebaseModule } from '../firebase/firebase.module';
+import { PromotionsModule } from '../promotions/promotions.module';
 import { forwardRef } from '@nestjs/common';
 
 @Module({
@@ -31,6 +41,7 @@ import { forwardRef } from '@nestjs/common';
     PaymentsModule,
     UsersModule,
     FirebaseModule,
+    PromotionsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService, InvoicesService],

@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  HttpCode,
+  HttpStatus,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { MenuItemsService } from './menu-items.service';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
@@ -38,7 +50,12 @@ export class MenuItemsController {
       search,
       restaurantId,
       isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
-      isAvailable: isAvailable === 'true' ? true : isAvailable === 'false' ? false : undefined,
+      isAvailable:
+        isAvailable === 'true'
+          ? true
+          : isAvailable === 'false'
+            ? false
+            : undefined,
     };
     return this.menuItemsService.findAll(parsedPage, parsedLimit, filters);
   }
@@ -59,9 +76,19 @@ export class MenuItemsController {
     const parsedLimit = limit ? parseInt(limit, 10) : 10;
     const filters = {
       isVeg: isVeg === 'true' ? true : isVeg === 'false' ? false : undefined,
-      isAvailable: isAvailable === 'true' ? true : isAvailable === 'false' ? false : undefined,
+      isAvailable:
+        isAvailable === 'true'
+          ? true
+          : isAvailable === 'false'
+            ? false
+            : undefined,
     };
-    return this.menuItemsService.findByRestaurant(id, parsedPage, parsedLimit, filters);
+    return this.menuItemsService.findByRestaurant(
+      id,
+      parsedPage,
+      parsedLimit,
+      filters,
+    );
   }
 
   /**
@@ -103,7 +130,11 @@ export class MenuItemsController {
    */
   @Patch(':id')
   @UseGuards(FirebaseAuthGuard)
-  update(@CurrUser() user: any, @Param('id') id: string, @Body() updateMenuItemDto: UpdateMenuItemDto) {
+  update(
+    @CurrUser() user: any,
+    @Param('id') id: string,
+    @Body() updateMenuItemDto: UpdateMenuItemDto,
+  ) {
     return this.menuItemsService.update(id, updateMenuItemDto, user);
   }
 

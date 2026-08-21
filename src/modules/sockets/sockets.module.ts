@@ -4,10 +4,7 @@ import { OrdersModule } from '../orders/orders.module';
 import { SocketsGateway } from './sockets.gateway';
 
 @Module({
-  imports: [
-    DriversModule,
-    forwardRef(() => OrdersModule),
-  ],
+  imports: [DriversModule, forwardRef(() => OrdersModule)],
   providers: [SocketsGateway],
   exports: [SocketsGateway],
 })

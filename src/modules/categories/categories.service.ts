@@ -7,7 +7,9 @@ import { Category, CategoryDocument } from './schemas/category.schema';
 
 @Injectable()
 export class CategoriesService {
-  constructor(@InjectModel(Category.name) private categoryModel: Model<CategoryDocument>) {}
+  constructor(
+    @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
+  ) {}
 
   async create(createCategoryDto: CreateCategoryDto) {
     const created = new this.categoryModel(createCategoryDto);
@@ -23,7 +25,9 @@ export class CategoriesService {
   }
 
   async update(id: string, updateCategoryDto: UpdateCategoryDto) {
-    const updated = await this.categoryModel.findByIdAndUpdate(id, updateCategoryDto, { returnDocument: 'after' }).exec();
+    const updated = await this.categoryModel
+      .findByIdAndUpdate(id, updateCategoryDto, { returnDocument: 'after' })
+      .exec();
     if (!updated) {
       throw new NotFoundException(`Category #${id} not found`);
     }

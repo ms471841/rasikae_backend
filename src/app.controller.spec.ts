@@ -19,4 +19,15 @@ describe('AppController', () => {
       expect(appController.getHello()).toBe('Rasikae Backend is running');
     });
   });
+
+  describe('health', () => {
+    it('should return system health payload', () => {
+      const health = appController.getHealth();
+      expect(health).toBeDefined();
+      expect(health.status).toBeDefined();
+      expect(health.database).toBeDefined();
+      expect(health.cache).toBeDefined();
+      expect(health.memory).toBeDefined();
+    });
+  });
 });

@@ -7,7 +7,9 @@ import { Cuisine, CuisineDocument } from './schemas/cuisine.schema';
 
 @Injectable()
 export class CuisinesService {
-  constructor(@InjectModel(Cuisine.name) private cuisineModel: Model<CuisineDocument>) {}
+  constructor(
+    @InjectModel(Cuisine.name) private cuisineModel: Model<CuisineDocument>,
+  ) {}
 
   async create(createCuisineDto: CreateCuisineDto) {
     const created = new this.cuisineModel(createCuisineDto);
@@ -23,7 +25,9 @@ export class CuisinesService {
   }
 
   async update(id: string, updateCuisineDto: UpdateCuisineDto) {
-    const updated = await this.cuisineModel.findByIdAndUpdate(id, updateCuisineDto, { returnDocument: 'after' }).exec();
+    const updated = await this.cuisineModel
+      .findByIdAndUpdate(id, updateCuisineDto, { returnDocument: 'after' })
+      .exec();
     if (!updated) {
       throw new NotFoundException(`Cuisine #${id} not found`);
     }

@@ -1,4 +1,14 @@
-import { IsNotEmpty, IsString, IsOptional, IsBoolean, IsArray, ValidateNested, IsIn, IsNumber, IsMongoId } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  ValidateNested,
+  IsIn,
+  IsNumber,
+  IsMongoId,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class LocationDto {
@@ -60,27 +70,11 @@ export class CreateRestaurantDto {
 
   @IsBoolean()
   @IsOptional()
-  isFeatured?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
   isFreeDelivery?: boolean;
 
   @IsBoolean()
   @IsOptional()
   isVeg?: boolean;
-
-  @IsNumber()
-  @IsOptional()
-  rating?: number;
-
-  @IsNumber()
-  @IsOptional()
-  ratingSum?: number;
-
-  @IsNumber()
-  @IsOptional()
-  ratingCount?: number;
 
   @ValidateNested()
   @Type(() => LocationDto)

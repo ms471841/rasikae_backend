@@ -3,7 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { CartsService } from './carts.service';
 import { CartsController } from './carts.controller';
 import { Cart, CartSchema } from './schemas/cart.schema';
-import { MenuItem, MenuItemSchema } from '../menu-items/schemas/menu-item.schema';
+import {
+  MenuItem,
+  MenuItemSchema,
+} from '../menu-items/schemas/menu-item.schema';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
 import { SocketsModule } from '../sockets/sockets.module';

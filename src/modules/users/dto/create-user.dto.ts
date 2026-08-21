@@ -20,8 +20,4 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   preference?: string;
-
-  @IsString()
-  @IsOptional()
-  role?: string;
 }

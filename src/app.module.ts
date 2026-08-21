@@ -32,13 +32,18 @@ import { SearchModule } from './modules/search/search.module';
 import { FavouriteRestaurantsModule } from './modules/favourite-restaurants/favourite-restaurants.module';
 import { ReportsModule } from './modules/reports/reports.module';
 
+import { CacheModule } from './modules/cache/cache.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000, // 1 minute
-      limit: 100, // 100 requests per minute
-    }]),
+    CacheModule,
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 1 minute
+        limit: 100, // 100 requests per minute
+      },
+    ]),
     DatabaseModule,
     FirebaseModule,
     AuthModule,

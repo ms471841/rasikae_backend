@@ -23,7 +23,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      
+
       // If the exception response is an object, it usually contains a 'message' property
       // (like the ones thrown by ValidationPipe).
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
@@ -33,7 +33,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     } else if (exception instanceof Error) {
       message = exception.message;
-      this.logger.error(`Unhandled Exception: ${exception.message}`, exception.stack);
+      this.logger.error(
+        `Unhandled Exception: ${exception.message}`,
+        exception.stack,
+      );
     } else {
       this.logger.error(`Unknown Exception: ${exception}`);
     }

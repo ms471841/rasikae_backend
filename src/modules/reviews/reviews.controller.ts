@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Param, Query, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { TargetType } from './schemas/review.schema';
@@ -35,7 +46,10 @@ export class ReviewsController {
    * GET /reviews/target/:targetId?targetType=RESTAURANT
    */
   @Get('target/:targetId')
-  findByTarget(@Param('targetId') targetId: string, @Query('targetType') targetType: TargetType) {
+  findByTarget(
+    @Param('targetId') targetId: string,
+    @Query('targetType') targetType: TargetType,
+  ) {
     return this.reviewsService.findByTarget(targetId, targetType);
   }
 

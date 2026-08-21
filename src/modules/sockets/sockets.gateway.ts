@@ -1,27 +1,68 @@
-import { ConnectedSocket, MessageBody, OnGatewayConnection, OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import {
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
+} from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { DriversService } from '../drivers/drivers.service';
 import { OrdersService } from '../orders/orders.service';
 import { forwardRef, Inject } from '@nestjs/common';
+import * as admin from 'firebase-admin';
+import { FIREBASE_APP } from '../firebase/firebase.module';
+import { UsersService } from '../users/users.service';
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
-export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class SocketsGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
-  private lastUpdateMap = new Map<string, { time: number; lat: number; lng: number }>();
+  private lastUpdateMap = new Map<
+    string,
+    { time: number; lat: number; lng: number }
+  >();
 
   constructor(
     private readonly driversService: DriversService,
     @Inject(forwardRef(() => OrdersService))
     private readonly ordersService: OrdersService,
+    @Inject(FIREBASE_APP) private readonly firebaseApp: admin.app.App,
+    private readonly usersService: UsersService,
   ) {}
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
+    try {
+      const authHeader =
+        client.handshake.auth?.token || client.handshake.headers?.authorization;
+      let token = '';
+      if (authHeader) {
+        token = authHeader.startsWith('Bearer ')
+          ? authHeader.split('Bearer ')[1]
+          : authHeader;
+      }
+      if (token) {
+        const decoded = await this.firebaseApp.auth().verifyIdToken(token);
+        let dbUser = null;
+        try {
+          dbUser = await this.usersService.getProfile(decoded.uid);
+        } catch {
+          dbUser = null;
+        }
+        client.data.user = dbUser || decoded;
+        client.data.firebaseUid = decoded.uid;
+      }
+    } catch (e) {
+      // Guest / unauthenticated socket connection
+    }
     console.log(`Client connected: ${client.id}`);
   }
 
@@ -36,27 +77,40 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
   ) {
     try {
       const order = await this.ordersService.getOrderById(data.orderId);
-      
-      // Basic security: Check if order belongs to user or is assigned to driver
-      // For now, if no uid, we allow (compatibility), but if uid is provided we check.
-      if (data.uid) {
-        const driver = await this.driversService.findByFirebaseUid(data.uid).catch(() => null);
-        const orderUserId = (order as any).userId?._id?.toString() || (order as any).userId?.toString();
-        const orderDriverId = (order as any).driverId?._id?.toString() || (order as any).driverId?.toString();
-        
-        const isOwner = order.userId && (order as any).userId.firebaseUid === data.uid;
-        const isAssignedDriver = driver && orderDriverId === driver._id.toString();
+      const user = client.data?.user;
 
-        if (!isOwner && !isAssignedDriver) {
-          console.warn(`Unauthorized join attempt for order ${data.orderId} by uid ${data.uid}`);
-          return { event: 'error', data: 'Unauthorized' };
+      if (user && user.role !== 'admin') {
+        const orderUserId =
+          (order as any).userId?._id?.toString() ||
+          (order as any).userId?.toString();
+        const orderDriverId =
+          (order as any).driverId?._id?.toString() ||
+          (order as any).driverId?.toString();
+        const orderVendorId = (order as any).restaurantId?.ownerId?.toString();
+
+        let isDriver = false;
+        if (user._id) {
+          const driver = await this.driversService
+            .findByUserId(user._id.toString())
+            .catch(() => null);
+          if (driver && driver._id.toString() === orderDriverId) {
+            isDriver = true;
+          }
+        }
+
+        const isCustomer =
+          (user._id && user._id.toString() === orderUserId) ||
+          user.firebaseUid === (order as any).userId?.firebaseUid;
+        const isVendor = user._id && user._id.toString() === orderVendorId;
+
+        if (!isCustomer && !isVendor && !isDriver) {
+          return { event: 'error', data: 'Unauthorized to join order room' };
         }
       }
 
       client.join(`order_${data.orderId}`);
-      console.log(`Client ${client.id} authorized for order_${data.orderId}`);
       return { event: 'joinedRoom', data: `Joined order_${data.orderId}` };
-    } catch (error) {
+    } catch {
       return { event: 'error', data: 'Order not found' };
     }
   }
@@ -66,9 +120,13 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @MessageBody() data: { uid: string },
     @ConnectedSocket() client: Socket,
   ) {
-    client.join(`vendor_${data.uid}`);
-    console.log(`Client ${client.id} joined vendor room: vendor_${data.uid}`);
-    return { event: 'joinedRoom', data: `Joined vendor_${data.uid}` };
+    const user = client.data?.user;
+    const uid = data?.uid;
+    if (!user || (user.role !== 'admin' && user.firebaseUid !== uid)) {
+      return { event: 'error', data: 'Unauthorized to join vendor room' };
+    }
+    client.join(`vendor_${uid}`);
+    return { event: 'joinedRoom', data: `Joined vendor_${uid}` };
   }
 
   @SubscribeMessage('joinDriverRoom')
@@ -76,10 +134,14 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @MessageBody() data: { uid: string },
     @ConnectedSocket() client: Socket,
   ) {
-    client.join(`driver_${data.uid}`);
-    (client as any).firebaseUid = data.uid; // Store UID for session tracking
-    console.log(`Client ${client.id} joined driver room: driver_${data.uid}`);
-    return { event: 'joinedRoom', data: `Joined driver_${data.uid}` };
+    const user = client.data?.user;
+    const uid = data?.uid;
+    if (!user || (user.role !== 'admin' && user.firebaseUid !== uid)) {
+      return { event: 'error', data: 'Unauthorized to join driver room' };
+    }
+    client.join(`driver_${uid}`);
+    client.data.firebaseUid = uid;
+    return { event: 'joinedRoom', data: `Joined driver_${uid}` };
   }
 
   @SubscribeMessage('joinAdminRoom')
@@ -87,8 +149,11 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @MessageBody() data: { token?: string },
     @ConnectedSocket() client: Socket,
   ) {
+    const user = client.data?.user;
+    if (!user || user.role !== 'admin') {
+      return { event: 'error', data: 'Unauthorized: Admin access required' };
+    }
     client.join(`admin`);
-    console.log(`[Socket] Admin ${client.id} joined 'admin' room. Total in room:`, this.server.sockets.adapter.rooms.get('admin')?.size);
     return { event: 'joinedRoom', data: `Joined admin stream` };
   }
 
@@ -97,14 +162,18 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     @MessageBody() data: { userId?: string; firebaseUid?: string },
     @ConnectedSocket() client: Socket,
   ) {
-    if (data?.userId) {
-      client.join(`user_${data.userId}`);
-      console.log(`Client ${client.id} joined user room: user_${data.userId}`);
+    const user = client.data?.user;
+    if (!user) {
+      return { event: 'error', data: 'Unauthorized' };
     }
-    if (data?.firebaseUid) {
-      client.join(`user_${data.firebaseUid}`);
-      console.log(`Client ${client.id} joined user room: user_${data.firebaseUid}`);
+    const isOwner =
+      (data?.userId && user._id?.toString() === data.userId) ||
+      (data?.firebaseUid && user.firebaseUid === data.firebaseUid);
+    if (user.role !== 'admin' && !isOwner) {
+      return { event: 'error', data: 'Unauthorized' };
     }
+    if (data?.userId) client.join(`user_${data.userId}`);
+    if (data?.firebaseUid) client.join(`user_${data.firebaseUid}`);
     return { event: 'joinedRoom', data: `Joined user room` };
   }
 
@@ -126,22 +195,32 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
     const lastUpdate = this.lastUpdateMap.get(firebaseUid);
     const now = Date.now();
-    
+
     // Save to DB if: No previous record, 30s passed, or moved > 100m
-    const shouldSave = !lastUpdate || 
-                       (now - lastUpdate.time) > 30000 || 
-                       this.calculateDistance(lastUpdate.lat, lastUpdate.lng, data.lat, data.lng) > 100;
+    const shouldSave =
+      !lastUpdate ||
+      now - lastUpdate.time > 30000 ||
+      this.calculateDistance(
+        lastUpdate.lat,
+        lastUpdate.lng,
+        data.lat,
+        data.lng,
+      ) > 100;
 
     if (shouldSave) {
       try {
         const driver = await this.driversService.findByFirebaseUid(firebaseUid);
         await this.driversService.updateLocation(driver._id.toString(), {
-          coordinates: [data.lng, data.lat] // GeoJSON is [lng, lat]
+          coordinates: [data.lng, data.lat], // GeoJSON is [lng, lat]
         });
-        
+
         // Update the throttling map
-        this.lastUpdateMap.set(firebaseUid, { time: now, lat: data.lat, lng: data.lng });
-        
+        this.lastUpdateMap.set(firebaseUid, {
+          time: now,
+          lat: data.lat,
+          lng: data.lng,
+        });
+
         // 3. Broadcast to Admin OCC (Global Visibility)
         this.server.to(`admin`).emit('driverLocationUpdated', {
           driverId: driver._id.toString(),
@@ -152,23 +231,32 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
           timestamp: new Date().toISOString(),
         });
 
-        console.log(`Saved location for driver ${firebaseUid} to DB and broadcast to Admin`);
+        console.log(
+          `Saved location for driver ${firebaseUid} to DB and broadcast to Admin`,
+        );
       } catch (error) {
-        console.error(`Failed to update driver location in DB: ${error.message}`);
+        console.error(
+          `Failed to update driver location in DB: ${error.message}`,
+        );
       }
     }
   }
 
-  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  private calculateDistance(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
     const R = 6371e3; // metres
     const φ1 = (lat1 * Math.PI) / 180;
     const φ2 = (lat2 * Math.PI) / 180;
     const Δφ = ((lat2 - lat1) * Math.PI) / 180;
     const Δλ = ((lon2 - lon1) * Math.PI) / 180;
 
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c;
@@ -184,7 +272,6 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     this.server.to(`order_${orderId}`).emit('orderStatusUpdated', payload);
     this.server.to(`admin`).emit('orderStatusUpdated', payload);
   }
-
 
   emitOrderStatusToVendor(vendorId: string, orderId: string, status: string) {
     this.server.to(`vendor_${vendorId}`).emit('orderStatusUpdated', {
@@ -202,11 +289,10 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
     });
   }
 
-
   emitNewOrder(vendorId: string, order: any) {
     // Ensure the order is serialized to a plain object with string IDs
     const serializedOrder = JSON.parse(JSON.stringify(order));
-    
+
     const payload = {
       order: serializedOrder,
       timestamp: new Date().toISOString(),
@@ -214,15 +300,16 @@ export class SocketsGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
     // Emit to vendor
     this.server.to(`vendor_${vendorId}`).emit('newOrder', payload);
-    
+
     // Emit to admin
     const adminRoom = this.server.sockets.adapter.rooms.get('admin');
-    console.log(`[Socket] Broadcasting newAdminOrder for ${serializedOrder._id}. Admin room size: ${adminRoom?.size || 0}`);
-    
+    console.log(
+      `[Socket] Broadcasting newAdminOrder for ${serializedOrder._id}. Admin room size: ${adminRoom?.size || 0}`,
+    );
+
     // Using this.server.to('admin') is correct, but let's be sure
     this.server.to('admin').emit('newAdminOrder', payload);
   }
-
 
   emitNewOrderToDriver(driverIdOrUid: string, order: any) {
     this.server.to(`driver_${driverIdOrUid}`).emit('newAssignment', {

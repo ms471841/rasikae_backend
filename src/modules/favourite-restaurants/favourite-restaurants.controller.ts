@@ -27,7 +27,10 @@ export class FavouriteRestaurantsController {
     @CurrUser() user: any,
     @Param('restaurantId') restaurantId: string,
   ) {
-    return this.favoritesService.toggleFavorite(user._id.toString(), restaurantId);
+    return this.favoritesService.toggleFavorite(
+      user._id.toString(),
+      restaurantId,
+    );
   }
 
   /**

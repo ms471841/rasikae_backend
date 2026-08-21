@@ -1,5 +1,17 @@
-import { Controller, Post, Body, Headers, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { PaymentsService } from './payments.service';
+import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
+import { CurrUser } from '../auth/decorators/user.decorator';
 
 /**
  * ============================================================================
@@ -20,19 +32,22 @@ export class PaymentsController {
    * POST /payments/verify
    */
   @Post('verify')
+  @UseGuards(FirebaseAuthGuard)
   @HttpCode(HttpStatus.OK)
   async verifyPayment(
-    @Body() body: { 
-      razorpayOrderId: string; 
-      razorpayPaymentId: string; 
+    @CurrUser() user: any,
+    @Body()
+    body: {
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
       razorpaySignature: string;
-      userId: string;
-    }
+      userId?: string;
+    },
   ) {
     const isValid = await this.paymentsService.verifyPaymentSignature(
       body.razorpayOrderId,
       body.razorpayPaymentId,
-      body.razorpaySignature
+      body.razorpaySignature,
     );
 
     if (!isValid) {
@@ -42,7 +57,8 @@ export class PaymentsController {
     return this.paymentsService.markTransactionSuccess(
       body.razorpayOrderId,
       body.razorpayPaymentId,
-      body.razorpaySignature
+      body.razorpaySignature,
+      user,
     );
   }
 
@@ -57,9 +73,14 @@ export class PaymentsController {
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(
+    @Req() req: any,
     @Body() body: any,
-    @Headers('x-razorpay-signature') signature: string
+    @Headers('x-razorpay-signature') signature: string,
   ) {
-    return this.paymentsService.handleWebhook(body, signature);
+    return this.paymentsService.handleWebhook(
+      req.rawBody || body,
+      body,
+      signature,
+    );
   }
 }

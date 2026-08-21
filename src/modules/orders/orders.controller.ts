@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, Query, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+  Query,
+  Res,
+} from '@nestjs/common';
 import * as express from 'express';
 import { OrdersService } from './orders.service';
 import { CheckoutDto } from './dto/create-order.dto';
@@ -53,7 +63,11 @@ export class OrdersController {
   ) {
     const parsedPage = Math.max(1, page ? parseInt(page, 10) : 1);
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    return this.ordersService.getUserOrders(user._id.toString(), parsedPage, parsedLimit);
+    return this.ordersService.getUserOrders(
+      user._id.toString(),
+      parsedPage,
+      parsedLimit,
+    );
   }
 
   /**
@@ -72,7 +86,12 @@ export class OrdersController {
   @Post('confirm-payment')
   confirmPayment(
     @CurrUser() user: any,
-    @Body() body: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+    @Body()
+    body: {
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySignature: string;
+    },
   ) {
     return this.ordersService.confirmPayment(
       user._id.toString(),
@@ -87,7 +106,11 @@ export class OrdersController {
    * GET /orders/:id/invoice
    */
   @Get(':id/invoice')
-  async getInvoice(@CurrUser() user: any, @Param('id') id: string, @Res() res: express.Response) {
+  async getInvoice(
+    @CurrUser() user: any,
+    @Param('id') id: string,
+    @Res() res: express.Response,
+  ) {
     const order = await this.ordersService.getOrderById(id, user);
     const pdfBuffer = await this.invoicesService.generateInvoicePdf(order);
 
@@ -135,7 +158,11 @@ export class OrdersController {
    * PATCH /orders/:id/status
    */
   @Patch(':id/status')
-  update(@CurrUser() user: any, @Param('id') id: string, @Body() updateOrderStatusDto: UpdateOrderStatusDto) {
+  update(
+    @CurrUser() user: any,
+    @Param('id') id: string,
+    @Body() updateOrderStatusDto: UpdateOrderStatusDto,
+  ) {
     return this.ordersService.updateOrderStatus(id, updateOrderStatusDto, user);
   }
 
@@ -144,7 +171,11 @@ export class OrdersController {
    * PATCH /orders/:id/assign-driver
    */
   @Patch(':id/assign-driver')
-  assignDriver(@CurrUser() user: any, @Param('id') id: string, @Body() assignDriverDto: AssignDriverDto) {
+  assignDriver(
+    @CurrUser() user: any,
+    @Param('id') id: string,
+    @Body() assignDriverDto: AssignDriverDto,
+  ) {
     return this.ordersService.assignDriver(id, assignDriverDto, user);
   }
 
@@ -166,7 +197,10 @@ export class OrdersController {
    * GET /orders/restaurant/:restaurantId
    */
   @Get('restaurant/:restaurantId')
-  findRestaurantOrders(@CurrUser() user: any, @Param('restaurantId') restaurantId: string) {
+  findRestaurantOrders(
+    @CurrUser() user: any,
+    @Param('restaurantId') restaurantId: string,
+  ) {
     return this.ordersService.getRestaurantOrders(restaurantId, user);
   }
 
@@ -184,7 +218,11 @@ export class OrdersController {
     const mongoUser = await this.usersService.getProfile(uid);
     const parsedPage = Math.max(1, page ? parseInt(page, 10) : 1);
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    return this.ordersService.getVendorOrders(mongoUser._id.toString(), parsedPage, parsedLimit);
+    return this.ordersService.getVendorOrders(
+      mongoUser._id.toString(),
+      parsedPage,
+      parsedLimit,
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -197,8 +235,12 @@ export class OrdersController {
    */
   @Get('driver/all')
   async findDriverOrders(@CurrUser() user: any) {
-    const mongoUser = await this.usersService.getProfile(user.uid || user.firebaseUid);
-    const driver = await this.driversService.findByUserId(mongoUser._id.toString());
+    const mongoUser = await this.usersService.getProfile(
+      user.uid || user.firebaseUid,
+    );
+    const driver = await this.driversService.findByUserId(
+      mongoUser._id.toString(),
+    );
     return this.ordersService.getDriverOrders(driver._id.toString());
   }
 
@@ -208,13 +250,17 @@ export class OrdersController {
    */
   @Patch(':id/delivered')
   async markDelivered(@Param('id') id: string, @CurrUser() user: any) {
-    const mongoUser = await this.usersService.getProfile(user.uid || user.firebaseUid);
+    const mongoUser = await this.usersService.getProfile(
+      user.uid || user.firebaseUid,
+    );
 
     if (mongoUser.role === 'admin') {
       return this.ordersService.markDelivered(id);
     }
 
-    const driver = await this.driversService.findByUserId(mongoUser._id.toString());
+    const driver = await this.driversService.findByUserId(
+      mongoUser._id.toString(),
+    );
     return this.ordersService.markDelivered(id, driver._id.toString());
   }
 }

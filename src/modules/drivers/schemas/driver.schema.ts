@@ -23,7 +23,12 @@ const LocationSchema = SchemaFactory.createForClass(Location);
 
 @Schema({ timestamps: true })
 export class Driver {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    unique: true,
+  })
   userId: mongoose.Types.ObjectId;
 
   @Prop({ type: String, enum: VehicleType, required: true })
@@ -49,3 +54,6 @@ export class Driver {
 }
 
 export const DriverSchema = SchemaFactory.createForClass(Driver);
+
+DriverSchema.index({ isAvailable: 1 });
+DriverSchema.index({ rating: -1 });

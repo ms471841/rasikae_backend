@@ -34,3 +34,10 @@ export class Review {
 }
 
 export const ReviewSchema = SchemaFactory.createForClass(Review);
+
+ReviewSchema.index({ targetId: 1, targetType: 1, createdAt: -1 });
+ReviewSchema.index({ userId: 1, createdAt: -1 });
+ReviewSchema.index(
+  { orderId: 1, targetId: 1, targetType: 1 },
+  { unique: true },
+);

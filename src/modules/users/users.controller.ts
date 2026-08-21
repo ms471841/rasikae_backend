@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Delete, UseGuards, Query, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Delete,
+  UseGuards,
+  Query,
+  Param,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -28,10 +38,7 @@ export class UsersController {
    * POST /users/sync
    */
   @Post('sync')
-  async syncUser(
-    @CurrUser() user: any,
-    @Body() createUserDto: CreateUserDto,
-  ) {
+  async syncUser(@CurrUser() user: any, @Body() createUserDto: CreateUserDto) {
     const uid = user?.uid || user?.firebaseUid;
     return this.usersService.syncUser(
       uid,
@@ -69,10 +76,7 @@ export class UsersController {
    * PATCH /users/fcm-token
    */
   @Patch('fcm-token')
-  async updateFcmToken(
-    @CurrUser() user: any,
-    @Body() dto: UpdateFcmTokenDto,
-  ) {
+  async updateFcmToken(@CurrUser() user: any, @Body() dto: UpdateFcmTokenDto) {
     const uid = user.uid || user.firebaseUid;
     return this.usersService.updateFcmToken(uid, dto);
   }
@@ -132,10 +136,7 @@ export class UsersController {
   @Patch('admin/:id/status')
   @UseGuards(RolesGuard)
   @Roles('admin')
-  async updateStatus(
-    @Param('id') id: string,
-    @Body('role') role: string,
-  ) {
+  async updateStatus(@Param('id') id: string, @Body('role') role: string) {
     return this.usersService.updateStatus(id, role);
   }
 

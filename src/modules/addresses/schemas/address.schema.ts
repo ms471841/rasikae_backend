@@ -57,3 +57,5 @@ export class Address {
 }
 
 export const AddressSchema = SchemaFactory.createForClass(Address);
+
+AddressSchema.index({ userId: 1, isDefault: -1 });

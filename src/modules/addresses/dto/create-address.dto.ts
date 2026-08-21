@@ -1,4 +1,15 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsEnum, IsArray, ArrayMinSize, ArrayMaxSize, ValidateNested, IsMongoId } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsBoolean,
+  IsEnum,
+  IsArray,
+  ArrayMinSize,
+  ArrayMaxSize,
+  ValidateNested,
+  IsMongoId,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { AddressLabel } from '../schemas/address.schema';
 

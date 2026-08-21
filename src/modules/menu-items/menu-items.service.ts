@@ -1,27 +1,52 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { MenuItem, MenuItemDocument } from './schemas/menu-item.schema';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
-import { Restaurant, RestaurantDocument } from '../restaurants/schemas/restaurant.schema';
+import {
+  Restaurant,
+  RestaurantDocument,
+} from '../restaurants/schemas/restaurant.schema';
+
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class MenuItemsService {
   constructor(
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
-    @InjectModel(Restaurant.name) private restaurantModel: Model<RestaurantDocument>,
+    @InjectModel(Restaurant.name)
+    private restaurantModel: Model<RestaurantDocument>,
+    private readonly cacheService: CacheService,
   ) {}
 
-  async create(createMenuItemDto: CreateMenuItemDto, currentUser?: any): Promise<MenuItem> {
+  async create(
+    createMenuItemDto: CreateMenuItemDto,
+    currentUser?: any,
+  ): Promise<MenuItem> {
     if (currentUser && currentUser.role !== 'admin') {
-      const restaurant = await this.restaurantModel.findById(createMenuItemDto.restaurantId).exec();
-      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
-        throw new ForbiddenException('You are not authorized to create menu items for this restaurant');
+      const restaurant = await this.restaurantModel
+        .findById(createMenuItemDto.restaurantId)
+        .exec();
+      if (
+        !restaurant ||
+        restaurant.ownerId.toString() !== currentUser._id.toString()
+      ) {
+        throw new ForbiddenException(
+          'You are not authorized to create menu items for this restaurant',
+        );
       }
     }
     const createdMenuItem = new this.menuItemModel(createMenuItemDto);
     const savedItem = await createdMenuItem.save();
+
+    // Invalidate caches
+    await this.cacheService.delByPattern(`menu:*`);
+    await this.cacheService.del(`restaurant:${savedItem.restaurantId}`);
 
     // Sync Categories & Cuisines to Restaurant
     const updateOps: any = {};
@@ -33,10 +58,9 @@ export class MenuItemsService {
     }
 
     if (Object.keys(updateOps).length > 0) {
-      await this.restaurantModel.findByIdAndUpdate(
-        savedItem.restaurantId,
-        { $addToSet: updateOps }
-      ).exec();
+      await this.restaurantModel
+        .findByIdAndUpdate(savedItem.restaurantId, { $addToSet: updateOps })
+        .exec();
     }
 
     return savedItem;
@@ -45,7 +69,12 @@ export class MenuItemsService {
   async findAll(
     page: number = 1,
     limit: number = 20,
-    filters: { search?: string; restaurantId?: string; isVeg?: boolean; isAvailable?: boolean } = {}
+    filters: {
+      search?: string;
+      restaurantId?: string;
+      isVeg?: boolean;
+      isAvailable?: boolean;
+    } = {},
   ): Promise<any> {
     const skip = (page - 1) * limit;
     const query: any = {};
@@ -64,14 +93,15 @@ export class MenuItemsService {
     }
 
     const [data, totalItems] = await Promise.all([
-      this.menuItemModel.find(query)
+      this.menuItemModel
+        .find(query)
         .populate('restaurantId', 'name logo')
         .populate('categoryIds cuisines')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec(),
-      this.menuItemModel.countDocuments(query).exec()
+      this.menuItemModel.countDocuments(query).exec(),
     ]);
 
     const totalPages = Math.ceil(totalItems / limit);
@@ -88,7 +118,7 @@ export class MenuItemsService {
     id: string,
     page: number = 1,
     limit: number = 10,
-    filters: { isVeg?: boolean; isAvailable?: boolean } = {}
+    filters: { isVeg?: boolean; isAvailable?: boolean } = {},
   ): Promise<any> {
     const skip = (page - 1) * limit;
     const query: any = { restaurantId: id };
@@ -130,12 +160,16 @@ export class MenuItemsService {
 
     // 1. Extract Popular Items (Top 5 by rating and count)
     const popularItems = [...allItems]
-      .sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.ratingCount || 0) - (a.ratingCount || 0))
+      .sort(
+        (a, b) =>
+          (b.rating || 0) - (a.rating || 0) ||
+          (b.ratingCount || 0) - (a.ratingCount || 0),
+      )
       .slice(0, 5);
 
     // 2. Group by Category
     const groupedMap = new Map<string, any[]>();
-    
+
     // Add popular section if exists
     if (popularItems.length > 0) {
       groupedMap.set('Popular Items', popularItems);
@@ -176,16 +210,27 @@ export class MenuItemsService {
     return menuItem;
   }
 
-  async update(id: string, updateMenuItemDto: UpdateMenuItemDto, currentUser?: any): Promise<MenuItem> {
+  async update(
+    id: string,
+    updateMenuItemDto: UpdateMenuItemDto,
+    currentUser?: any,
+  ): Promise<MenuItem> {
     const oldItem = await this.menuItemModel.findById(id).exec();
     if (!oldItem) {
       throw new NotFoundException(`MenuItem with ID ${id} not found`);
     }
 
     if (currentUser && currentUser.role !== 'admin') {
-      const restaurant = await this.restaurantModel.findById(oldItem.restaurantId).exec();
-      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
-        throw new ForbiddenException('You are not authorized to update menu items for this restaurant');
+      const restaurant = await this.restaurantModel
+        .findById(oldItem.restaurantId)
+        .exec();
+      if (
+        !restaurant ||
+        restaurant.ownerId.toString() !== currentUser._id.toString()
+      ) {
+        throw new ForbiddenException(
+          'You are not authorized to update menu items for this restaurant',
+        );
       }
     }
 
@@ -203,16 +248,20 @@ export class MenuItemsService {
     // 1. Handle Categories
     if (updateMenuItemDto.categoryIds) {
       // Add newly selected categories
-      await this.restaurantModel.findByIdAndUpdate(
-        restaurantId,
-        { $addToSet: { categories: { $each: updatedMenuItem.categoryIds } } }
-      ).exec();
+      await this.restaurantModel
+        .findByIdAndUpdate(restaurantId, {
+          $addToSet: { categories: { $each: updatedMenuItem.categoryIds } },
+        })
+        .exec();
 
       // Cleanup old categories that are no longer present in the item
-      const removedCats = oldItem.categoryIds.filter(catId => 
-        !updatedMenuItem.categoryIds.some(newId => newId.toString() === catId.toString())
+      const removedCats = oldItem.categoryIds.filter(
+        (catId) =>
+          !updatedMenuItem.categoryIds.some(
+            (newId) => newId.toString() === catId.toString(),
+          ),
       );
-      
+
       for (const catId of removedCats) {
         await this.syncRestaurantCategories(restaurantId, catId.toString());
       }
@@ -221,23 +270,29 @@ export class MenuItemsService {
     // 2. Handle Cuisines
     if (updateMenuItemDto.cuisines) {
       // Add newly selected cuisines
-      await this.restaurantModel.findByIdAndUpdate(
-        restaurantId,
-        { $addToSet: { cuisines: { $each: updatedMenuItem.cuisines } } }
-      ).exec();
+      await this.restaurantModel
+        .findByIdAndUpdate(restaurantId, {
+          $addToSet: { cuisines: { $each: updatedMenuItem.cuisines } },
+        })
+        .exec();
 
       // Cleanup old cuisines
       const oldCuisines = oldItem.cuisines || [];
       const newCuisines = updatedMenuItem.cuisines || [];
-      
-      const removedCuisines = oldCuisines.filter(cId => 
-        !newCuisines.some(newId => newId.toString() === cId.toString())
+
+      const removedCuisines = oldCuisines.filter(
+        (cId) =>
+          !newCuisines.some((newId) => newId.toString() === cId.toString()),
       );
 
       for (const cId of removedCuisines) {
         await this.syncRestaurantCuisines(restaurantId, cId.toString());
       }
     }
+
+    // Invalidate caches
+    await this.cacheService.delByPattern(`menu:*`);
+    await this.cacheService.del(`restaurant:${restaurantId}`);
 
     return updatedMenuItem;
   }
@@ -249,18 +304,31 @@ export class MenuItemsService {
     }
 
     if (currentUser && currentUser.role !== 'admin') {
-      const restaurant = await this.restaurantModel.findById(item.restaurantId).exec();
-      if (!restaurant || restaurant.ownerId.toString() !== currentUser._id.toString()) {
-        throw new ForbiddenException('You are not authorized to delete menu items for this restaurant');
+      const restaurant = await this.restaurantModel
+        .findById(item.restaurantId)
+        .exec();
+      if (
+        !restaurant ||
+        restaurant.ownerId.toString() !== currentUser._id.toString()
+      ) {
+        throw new ForbiddenException(
+          'You are not authorized to delete menu items for this restaurant',
+        );
       }
     }
 
-    const deletedMenuItem = await this.menuItemModel.findByIdAndDelete(id).exec();
+    const deletedMenuItem = await this.menuItemModel
+      .findByIdAndDelete(id)
+      .exec();
     if (!deletedMenuItem) {
       throw new NotFoundException(`MenuItem with ID ${id} not found`);
     }
 
     const restaurantId = deletedMenuItem.restaurantId.toString();
+
+    // Invalidate caches
+    await this.cacheService.delByPattern(`menu:*`);
+    await this.cacheService.del(`restaurant:${restaurantId}`);
 
     // Cleanup Categories
     if (deletedMenuItem.categoryIds) {
@@ -279,31 +347,39 @@ export class MenuItemsService {
     return deletedMenuItem;
   }
 
-  private async syncRestaurantCategories(restaurantId: string, categoryId: string) {
-    const count = await this.menuItemModel.countDocuments({
-      restaurantId,
-      categoryIds: categoryId,
-    }).exec();
+  private async syncRestaurantCategories(
+    restaurantId: string,
+    categoryId: string,
+  ) {
+    const count = await this.menuItemModel
+      .countDocuments({
+        restaurantId,
+        categoryIds: categoryId,
+      })
+      .exec();
 
     if (count === 0) {
-      await this.restaurantModel.findByIdAndUpdate(
-        restaurantId,
-        { $pull: { categories: categoryId } }
-      ).exec();
+      await this.restaurantModel
+        .findByIdAndUpdate(restaurantId, { $pull: { categories: categoryId } })
+        .exec();
     }
   }
 
-  private async syncRestaurantCuisines(restaurantId: string, cuisineId: string) {
-    const count = await this.menuItemModel.countDocuments({
-      restaurantId,
-      cuisines: cuisineId,
-    }).exec();
+  private async syncRestaurantCuisines(
+    restaurantId: string,
+    cuisineId: string,
+  ) {
+    const count = await this.menuItemModel
+      .countDocuments({
+        restaurantId,
+        cuisines: cuisineId,
+      })
+      .exec();
 
     if (count === 0) {
-      await this.restaurantModel.findByIdAndUpdate(
-        restaurantId,
-        { $pull: { cuisines: cuisineId } }
-      ).exec();
+      await this.restaurantModel
+        .findByIdAndUpdate(restaurantId, { $pull: { cuisines: cuisineId } })
+        .exec();
     }
   }
 }
