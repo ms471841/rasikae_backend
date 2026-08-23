@@ -23,6 +23,8 @@ export class FirebaseAuthGuard implements CanActivate {
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.split('Bearer ')[1];
+    } else if (request.query?.token) {
+      token = request.query.token as string;
     }
 
     if (!token) {
