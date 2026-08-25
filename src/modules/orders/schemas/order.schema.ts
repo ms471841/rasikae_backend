@@ -153,6 +153,9 @@ export class Order {
   @Prop({ required: true, default: 'PENDING' })
   paymentStatus: string;
 
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Zone', index: true })
+  zoneId?: mongoose.Types.ObjectId;
+
   @Prop({ default: false })
   isReviewed: boolean;
 
@@ -173,5 +176,6 @@ export const OrderSchema = SchemaFactory.createForClass(Order);
 
 OrderSchema.index({ userId: 1, createdAt: -1 });
 OrderSchema.index({ restaurantId: 1, status: 1, createdAt: -1 });
-OrderSchema.index({ driverId: 1, status: 1 });
+OrderSchema.index({ zoneId: 1, status: 1, createdAt: -1 });
 OrderSchema.index({ status: 1, createdAt: -1 });
+OrderSchema.index({ driverId: 1, status: 1 });

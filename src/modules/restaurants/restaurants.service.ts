@@ -14,7 +14,7 @@ import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { WalletsService } from '../wallets/wallets.service';
 import { Vendor, VendorDocument } from '../vendors/schemas/vendor.schema';
-
+import { ZonesService } from '../zones/zones.service';
 import { CacheService } from '../cache/cache.service';
 
 @Injectable()
@@ -26,17 +26,33 @@ export class RestaurantsService {
     @InjectModel(BankAccount.name)
     private bankAccountModel: Model<BankAccountDocument>,
     private readonly walletsService: WalletsService,
+    private readonly zonesService: ZonesService,
     private readonly cacheService: CacheService,
   ) {}
 
   async create(
     ownerId: string,
-    createRestaurantDto: CreateRestaurantDto,
+    createRestaurantDto: CreateRestaurantDto & { zoneId?: string },
   ): Promise<Restaurant> {
-    const newRestaurant = new this.restaurantModel({
+    const payload: any = {
       ...createRestaurantDto,
       ownerId,
-    });
+    };
+
+    // Auto-detect Zone if location coordinates are provided and zoneId is not explicitly set
+    if (
+      !payload.zoneId &&
+      payload.location?.coordinates &&
+      payload.location.coordinates.length === 2
+    ) {
+      const [lng, lat] = payload.location.coordinates;
+      const matchedZone = await this.zonesService.findByCoordinates(lng, lat);
+      if (matchedZone) {
+        payload.zoneId = matchedZone._id;
+      }
+    }
+
+    const newRestaurant = new this.restaurantModel(payload);
     const savedRestaurant = await newRestaurant.save();
 
     // 1. Invalidate restaurant search caches
@@ -47,7 +63,7 @@ export class RestaurantsService {
       savedRestaurant._id.toString(),
     );
 
-    // 2. Link to Vendor Profile
+    // 3. Link to Vendor Profile
     await this.vendorModel
       .updateOne(
         { userId: new mongoose.Types.ObjectId(ownerId) },
@@ -112,6 +128,16 @@ export class RestaurantsService {
       mongoose.Types.ObjectId.isValid(filters.categoryId)
     ) {
       baseMatch.categories = new mongoose.Types.ObjectId(filters.categoryId);
+    }
+    if ((filters as any).zoneId) {
+      const z = (filters as any).zoneId;
+      if (Array.isArray(z) && z.length > 0) {
+        baseMatch.zoneId = {
+          $in: z.map((item: any) => new mongoose.Types.ObjectId(item)),
+        };
+      } else if (typeof z === 'string' && mongoose.Types.ObjectId.isValid(z)) {
+        baseMatch.zoneId = new mongoose.Types.ObjectId(z);
+      }
     }
 
     // Determine sort stage
@@ -351,6 +377,19 @@ export class RestaurantsService {
       delete payload.isFeatured;
       delete payload.totalDeliveryTimeMinutes;
       delete payload.deliveryCount;
+    }
+
+    // Auto-detect Zone if location coordinates are updated and zoneId is not explicitly set
+    if (
+      !payload.zoneId &&
+      payload.location?.coordinates &&
+      payload.location.coordinates.length === 2
+    ) {
+      const [lng, lat] = payload.location.coordinates;
+      const matchedZone = await this.zonesService.findByCoordinates(lng, lat);
+      if (matchedZone) {
+        payload.zoneId = matchedZone._id;
+      }
     }
 
     const existingRestaurant = await this.restaurantModel

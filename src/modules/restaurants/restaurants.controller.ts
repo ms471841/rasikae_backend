@@ -98,6 +98,7 @@ export class RestaurantsController {
     @Query('nearAndFast') nearAndFast?: string,
     @Query('hasOffers') hasOffers?: string,
     @Query('maxPrice') maxPrice?: string,
+    @Query('zoneId') zoneId?: string,
   ) {
     const parsedPage = page ? parseInt(page, 10) : 1;
     const parsedLimit = limit ? parseInt(limit, 10) : 10;
@@ -111,6 +112,7 @@ export class RestaurantsController {
       cuisines: cuisines ? cuisines.split(',') : undefined,
       categoryId: categoryId,
       status: status,
+      zoneId: zoneId,
       isPublished:
         isPublished === 'true'
           ? true
@@ -131,6 +133,18 @@ export class RestaurantsController {
       parsedLng,
       filters,
     );
+  }
+
+  /**
+   * [🍳 VENDOR APP] Get restaurants owned by logged-in vendor user
+   * GET /restaurants/my-restaurants
+   */
+  @Get('my-restaurants')
+  @UseGuards(FirebaseAuthGuard)
+  async findMyRestaurants(@CurrUser() user: any) {
+    const uid = user.uid || user.firebaseUid;
+    const mongoUser = await this.usersService.getProfile(uid);
+    return this.restaurantsService.findByOwner(mongoUser._id.toString());
   }
 
   /**
@@ -166,18 +180,6 @@ export class RestaurantsController {
     }
 
     return this.restaurantsService.create(targetOwnerId, createRestaurantDto);
-  }
-
-  /**
-   * [🍳 VENDOR APP] Get restaurants owned by logged-in vendor user
-   * GET /restaurants/my-restaurants
-   */
-  @Get('my-restaurants')
-  @UseGuards(FirebaseAuthGuard)
-  async findMyRestaurants(@CurrUser() user: any) {
-    const uid = user.uid || user.firebaseUid;
-    const mongoUser = await this.usersService.getProfile(uid);
-    return this.restaurantsService.findByOwner(mongoUser._id.toString());
   }
 
   /**

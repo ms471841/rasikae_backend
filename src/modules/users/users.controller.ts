@@ -161,4 +161,57 @@ export class UsersController {
   async toggleActive(@Param('id') id: string) {
     return this.usersService.toggleUserActive(id);
   }
+
+  /**
+   * [👑 ADMIN PANEL] Get list of all Sub-Admins (Branch/Zone Managers)
+   * GET /users/admin/sub-admins
+   */
+  @Get('admin/sub-admins')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async getSubAdmins() {
+    return this.usersService.getSubAdmins();
+  }
+
+  /**
+   * [👑 ADMIN PANEL] Provision / Create a new Sub-Admin
+   * POST /users/admin/sub-admins
+   */
+  @Post('admin/sub-admins')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async createSubAdmin(
+    @Body()
+    dto: {
+      name: string;
+      email: string;
+      phone?: string;
+      assignedZones?: string[];
+      permissions?: any;
+    },
+  ) {
+    return this.usersService.createSubAdmin(dto);
+  }
+
+  /**
+   * [👑 ADMIN PANEL] Update Sub-Admin details, permissions or assigned zones
+   * PATCH /users/admin/sub-admins/:id
+   */
+  @Patch('admin/sub-admins/:id')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async updateSubAdmin(
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      assignedZones?: string[];
+      permissions?: any;
+      isActive?: boolean;
+    },
+  ) {
+    return this.usersService.updateSubAdmin(id, dto);
+  }
 }

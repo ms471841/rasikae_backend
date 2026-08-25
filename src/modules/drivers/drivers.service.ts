@@ -16,6 +16,7 @@ import { UpdateDriverStatusDto } from './dto/update-driver-status.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
 import { WalletsService } from '../wallets/wallets.service';
 import { UsersService } from '../users/users.service';
+import { ZonesService } from '../zones/zones.service';
 
 @Injectable()
 export class DriversService {
@@ -24,6 +25,7 @@ export class DriversService {
     @Inject(FIREBASE_APP) private firebaseApp: admin.app.App,
     private readonly usersService: UsersService,
     private readonly walletsService: WalletsService,
+    private readonly zonesService: ZonesService,
   ) {}
 
   async checkDriverExistsByPhone(phone: string): Promise<boolean> {
@@ -245,15 +247,29 @@ export class DriversService {
         );
       }
     }
+    const [lng, lat] = updateLocationDto.coordinates;
+    let activeZoneId: any = undefined;
+    if (lng != null && lat != null) {
+      const matchedZone = await this.zonesService.findByCoordinates(lng, lat);
+      if (matchedZone) {
+        activeZoneId = matchedZone._id;
+      }
+    }
+
+    const updatePayload: any = {
+      currentLocation: {
+        type: 'Point',
+        coordinates: updateLocationDto.coordinates,
+      },
+    };
+    if (activeZoneId) {
+      updatePayload.activeZoneId = activeZoneId;
+    }
+
     const driver = await this.driverModel
       .findByIdAndUpdate(
         id,
-        {
-          currentLocation: {
-            type: 'Point',
-            coordinates: updateLocationDto.coordinates,
-          },
-        },
+        updatePayload,
         { returnDocument: 'after' },
       )
       .exec();

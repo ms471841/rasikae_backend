@@ -60,16 +60,6 @@ export class DriversController {
   }
 
   /**
-   * [🛵 DRIVER APP / 👑 ADMIN] Get single driver profile details
-   * GET /drivers/:id
-   */
-  @Get(':id')
-  @UseGuards(FirebaseAuthGuard)
-  findOne(@Param('id') id: string) {
-    return this.driversService.findOne(id);
-  }
-
-  /**
    * [🛵 DRIVER APP] Update driver status (e.g. ONLINE, OFFLINE, ON_DELIVERY)
    * PATCH /drivers/:id/status
    */
@@ -107,7 +97,7 @@ export class DriversController {
    */
   @Post('onboard')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'sub_admin')
   @HttpCode(HttpStatus.CREATED)
   onboard(@Body() onboardDriverDto: OnboardDriverDto) {
     return this.driversService.onboardDriver(onboardDriverDto);
@@ -119,7 +109,7 @@ export class DriversController {
    */
   @Get()
   @UseGuards(FirebaseAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'sub_admin')
   findAll() {
     return this.driversService.findAll();
   }
@@ -130,7 +120,7 @@ export class DriversController {
    */
   @Get('admin/fleet')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'sub_admin')
   getFleet() {
     return this.driversService.getFleet();
   }
@@ -167,5 +157,15 @@ export class DriversController {
       parseFloat(lat),
       maxDistance,
     );
+  }
+
+  /**
+   * [🛵 DRIVER APP / 👑 ADMIN] Get single driver profile details by ID
+   * GET /drivers/:id
+   */
+  @Get(':id')
+  @UseGuards(FirebaseAuthGuard)
+  findOne(@Param('id') id: string) {
+    return this.driversService.findOne(id);
   }
 }

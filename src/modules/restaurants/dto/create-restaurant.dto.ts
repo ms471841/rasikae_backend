@@ -101,4 +101,8 @@ export class CreateRestaurantDto {
   @IsString()
   @IsOptional()
   fssaiNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  zoneId?: string;
 }

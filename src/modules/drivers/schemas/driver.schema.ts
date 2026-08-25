@@ -49,11 +49,15 @@ export class Driver {
   @Prop({ default: 0 })
   ratingCount: number;
 
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Zone', index: true })
+  activeZoneId?: mongoose.Types.ObjectId;
+
   @Prop({ default: 0 })
   totalDeliveries: number;
 }
 
 export const DriverSchema = SchemaFactory.createForClass(Driver);
 
+DriverSchema.index({ activeZoneId: 1, isAvailable: 1 });
 DriverSchema.index({ isAvailable: 1 });
 DriverSchema.index({ rating: -1 });

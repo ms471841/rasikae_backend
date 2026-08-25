@@ -208,7 +208,19 @@ export class OrdersService {
       const cgst = Math.round(staticTax / 2);
       const sgst = staticTax - cgst; // Remaining goes to SGST (handles odd paise)
 
-      const staticDeliveryFee = settings.deliveryBaseFee;
+      const restaurant = await this.restaurantModel
+        .findById(restaurantIdStr)
+        .populate('zoneId')
+        .exec();
+
+      const zone = (restaurant as any)?.zoneId;
+      const baseDeliveryFee =
+        zone && zone.baseDeliveryFeeInPaise != null
+          ? zone.baseDeliveryFeeInPaise
+          : settings.deliveryBaseFee;
+      const surgeFee = zone && zone.surgeFeeInPaise ? zone.surgeFeeInPaise : 0;
+      const staticDeliveryFee = baseDeliveryFee + surgeFee;
+
       const packagingFee = items.reduce(
         (acc, current) =>
           acc + (current.packagingCharge || 0) * current.quantity,
@@ -248,6 +260,7 @@ export class OrdersService {
       const orderData = {
         userId: new Types.ObjectId(userId),
         restaurantId: new Types.ObjectId(restaurantIdStr),
+        zoneId: zone?._id || (restaurant as any)?.zoneId,
         items: items,
         deliveryAddress,
         subTotal,
@@ -375,7 +388,20 @@ export class OrdersService {
       const staticTax = Math.round(subTotal * settings.taxPercentage);
       const cgst = Math.round(staticTax / 2);
       const sgst = staticTax - cgst;
-      const deliveryFee = settings.deliveryBaseFee;
+
+      const restaurant = await this.restaurantModel
+        .findById(restaurantIdStr)
+        .populate('zoneId')
+        .exec();
+
+      const zone = (restaurant as any)?.zoneId;
+      const baseDeliveryFee =
+        zone && zone.baseDeliveryFeeInPaise != null
+          ? zone.baseDeliveryFeeInPaise
+          : settings.deliveryBaseFee;
+      const surgeFee = zone && zone.surgeFeeInPaise ? zone.surgeFeeInPaise : 0;
+      const deliveryFee = baseDeliveryFee + surgeFee;
+
       const packagingFee = items.reduce(
         (acc, i) => acc + (i.packagingCharge || 0) * i.quantity,
         0,
@@ -414,6 +440,7 @@ export class OrdersService {
       grandTotal += totalAmount;
       orderSnapshots.push({
         restaurantId: restaurantIdStr,
+        zoneId: zone?._id || (restaurant as any)?.zoneId,
         items,
         deliveryAddress,
         subTotal,
@@ -481,6 +508,7 @@ export class OrdersService {
       const order = new this.orderModel({
         userId: new Types.ObjectId(userId),
         restaurantId: new Types.ObjectId(snap.restaurantId),
+        zoneId: snap.zoneId ? new Types.ObjectId(snap.zoneId) : undefined,
         items: snap.items.map((i: any) => ({
           ...i,
           menuItemId: new Types.ObjectId(i.menuItemId),
@@ -1189,12 +1217,20 @@ export class OrdersService {
   }
 
   async getAllOrders(
+    user?: any,
     page: number = 1,
     limit: number = 20,
     status?: string,
   ): Promise<any> {
     const skip = (page - 1) * limit;
     let query: any = {};
+
+    if (user && user.role === 'sub_admin') {
+      const assignedIds = (user.assignedZones || []).map(
+        (z: any) => new Types.ObjectId(z),
+      );
+      query.zoneId = { $in: assignedIds };
+    }
 
     if (status === 'active') {
       query = {

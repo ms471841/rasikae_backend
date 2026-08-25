@@ -123,15 +123,6 @@ export class OrdersController {
     res.end(pdfBuffer);
   }
 
-  /**
-   * [📱 USER APP / 👑 ADMIN / 🍳 VENDOR / 🛵 DRIVER] Get single order details by ID
-   * GET /orders/:id
-   */
-  @Get(':id')
-  findOne(@CurrUser() user: any, @Param('id') id: string) {
-    return this.ordersService.getOrderById(id, user);
-  }
-
   // --------------------------------------------------------------------------
   // 👑 ADMIN PANEL APIs
   // --------------------------------------------------------------------------
@@ -142,15 +133,25 @@ export class OrdersController {
    */
   @Get('all')
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'sub_admin')
   async findAllOrders(
+    @CurrUser() user: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('status') status?: string,
   ) {
     const parsedPage = Math.max(1, page ? parseInt(page, 10) : 1);
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    return this.ordersService.getAllOrders(parsedPage, parsedLimit, status);
+    return this.ordersService.getAllOrders(user, parsedPage, parsedLimit, status);
+  }
+
+  /**
+   * [📱 USER APP / 👑 ADMIN / 🍳 VENDOR / 🛵 DRIVER] Get single order details by ID
+   * GET /orders/:id
+   */
+  @Get(':id')
+  findOne(@CurrUser() user: any, @Param('id') id: string) {
+    return this.ordersService.getOrderById(id, user);
   }
 
   /**

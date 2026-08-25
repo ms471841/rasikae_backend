@@ -126,16 +126,23 @@ export class ReviewsService {
   }
 
   async findByTarget(targetId: string, targetType: string): Promise<Review[]> {
+    if (!Types.ObjectId.isValid(targetId)) {
+      throw new BadRequestException('Invalid Target ID format');
+    }
     return this.reviewModel
       .find({
         targetId: new Types.ObjectId(targetId),
         targetType,
       })
+      .populate('userId', 'name profilePicture')
       .sort({ createdAt: -1 })
       .exec();
   }
 
   async findByUser(userId: string): Promise<Review[]> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid User ID format');
+    }
     return this.reviewModel
       .find({ userId: new Types.ObjectId(userId) })
       .sort({ createdAt: -1 })

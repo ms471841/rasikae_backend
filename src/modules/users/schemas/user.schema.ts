@@ -25,9 +25,40 @@ export class User {
 
   @Prop({
     default: 'customer',
-    enum: ['customer', 'admin', 'vendor', 'driver'],
+    enum: ['customer', 'admin', 'sub_admin', 'vendor', 'driver'],
   })
   role: string;
+
+  @Prop({
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Zone' }],
+    default: [],
+  })
+  assignedZones: mongoose.Types.ObjectId[];
+
+  @Prop({
+    type: {
+      canManageOrders: { type: Boolean, default: true },
+      canApproveRestaurants: { type: Boolean, default: true },
+      canManageDrivers: { type: Boolean, default: true },
+      canViewFinancials: { type: Boolean, default: false },
+      canTriggerSurge: { type: Boolean, default: true },
+    },
+    default: {
+      canManageOrders: true,
+      canApproveRestaurants: true,
+      canManageDrivers: true,
+      canViewFinancials: false,
+      canTriggerSurge: true,
+    },
+    _id: false,
+  })
+  permissions: {
+    canManageOrders: boolean;
+    canApproveRestaurants: boolean;
+    canManageDrivers: boolean;
+    canViewFinancials: boolean;
+    canTriggerSurge: boolean;
+  };
 
   @Prop({ type: [String], default: [] })
   fcmTokens: string[];

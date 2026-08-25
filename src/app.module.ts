@@ -31,6 +31,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { SearchModule } from './modules/search/search.module';
 import { FavouriteRestaurantsModule } from './modules/favourite-restaurants/favourite-restaurants.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { ZonesModule } from './modules/zones/zones.module';
 
 import { CacheModule } from './modules/cache/cache.module';
 
@@ -69,6 +70,7 @@ import { CacheModule } from './modules/cache/cache.module';
     SearchModule,
     FavouriteRestaurantsModule,
     ReportsModule,
+    ZonesModule,
   ],
   controllers: [AppController],
   providers: [

@@ -6,6 +6,7 @@ import { Restaurant, RestaurantSchema } from './schemas/restaurant.schema';
 import { BankAccount, BankAccountSchema } from './schemas/bank-account.schema';
 import { UsersModule } from '../users/users.module';
 import { WalletsModule } from '../wallets/wallets.module';
+import { ZonesModule } from '../zones/zones.module';
 import { Vendor, VendorSchema } from '../vendors/schemas/vendor.schema';
 
 @Module({
@@ -17,6 +18,7 @@ import { Vendor, VendorSchema } from '../vendors/schemas/vendor.schema';
     ]),
     UsersModule,
     WalletsModule,
+    ZonesModule,
   ],
   controllers: [RestaurantsController],
   providers: [RestaurantsService],

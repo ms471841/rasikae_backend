@@ -24,7 +24,22 @@ export class AnalyticsService {
     @InjectModel(Driver.name) private driverModel: Model<DriverDocument>,
   ) {}
 
-  async getGlobalStats() {
+  async getGlobalStats(user?: any) {
+    const isSubAdmin = user?.role === 'sub_admin';
+    const assignedZones = (user?.assignedZones || []).map((z: any) =>
+      typeof z === 'string' ? new Types.ObjectId(z) : z,
+    );
+
+    const orderFilter: any = isSubAdmin && assignedZones.length > 0
+      ? { zoneId: { $in: assignedZones } }
+      : {};
+    const restaurantFilter: any = isSubAdmin && assignedZones.length > 0
+      ? { zoneId: { $in: assignedZones } }
+      : {};
+    const driverFilter: any = isSubAdmin && assignedZones.length > 0
+      ? { activeZoneId: { $in: assignedZones } }
+      : {};
+
     const [
       revenueStats,
       orderCounts,
@@ -34,7 +49,7 @@ export class AnalyticsService {
     ] = await Promise.all([
       // 1. Total Revenue
       this.orderModel.aggregate([
-        { $match: { status: 'DELIVERED' } },
+        { $match: { ...orderFilter, status: 'DELIVERED' } },
         {
           $group: {
             _id: null,
@@ -45,6 +60,7 @@ export class AnalyticsService {
 
       // 2. Orders by Status
       this.orderModel.aggregate([
+        { $match: orderFilter },
         {
           $group: {
             _id: '$status',
@@ -53,10 +69,10 @@ export class AnalyticsService {
         },
       ]),
 
-      // 3. User counts
+      // 3. Entity counts
       this.userModel.countDocuments().exec(),
-      this.restaurantModel.countDocuments().exec(),
-      this.driverModel.countDocuments().exec(),
+      this.restaurantModel.countDocuments(restaurantFilter).exec(),
+      this.driverModel.countDocuments(driverFilter).exec(),
     ]);
 
     const totalRevenue =
@@ -77,7 +93,16 @@ export class AnalyticsService {
     };
   }
 
-  async getWeeklyTrends() {
+  async getWeeklyTrends(user?: any) {
+    const isSubAdmin = user?.role === 'sub_admin';
+    const assignedZones = (user?.assignedZones || []).map((z: any) =>
+      typeof z === 'string' ? new Types.ObjectId(z) : z,
+    );
+
+    const orderFilter: any = isSubAdmin && assignedZones.length > 0
+      ? { zoneId: { $in: assignedZones } }
+      : {};
+
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -85,6 +110,7 @@ export class AnalyticsService {
     const trends = await this.orderModel.aggregate([
       {
         $match: {
+          ...orderFilter,
           createdAt: { $gte: sevenDaysAgo },
           status: 'DELIVERED',
         },

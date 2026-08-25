@@ -85,8 +85,11 @@ export class Restaurant {
   @Prop()
   address?: string;
 
-  @Prop()
+  @Prop({ trim: true, index: true })
   city?: string;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Zone', index: true })
+  zoneId?: mongoose.Types.ObjectId;
 
   @Prop({ type: OperatingHoursSchema })
   operatingHours?: OperatingHours;

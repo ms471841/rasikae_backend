@@ -33,11 +33,24 @@ export class UsersService {
   ): Promise<User> {
     let user = await this.userModel.findOne({ firebaseUid }).exec();
 
+    // If not found by UID, check by email to link pre-provisioned Sub-Admins or Staff
+    const lookupEmail = email || dto.email;
+    if (!user && lookupEmail) {
+      user = await this.userModel.findOne({ email: lookupEmail }).exec();
+      if (user) {
+        user.firebaseUid = firebaseUid;
+        if (dto.name && !user.name) user.name = dto.name;
+        if (dto.avatarUrl) user.avatarUrl = dto.avatarUrl;
+        await user.save();
+        return user;
+      }
+    }
+
     if (!user) {
       user = new this.userModel({
         firebaseUid,
         name: dto.name,
-        email: email || dto.email,
+        email: lookupEmail,
         phone: phone || dto.phone,
         avatarUrl: dto.avatarUrl,
         preference: dto.preference,
@@ -339,5 +352,134 @@ export class UsersService {
       totalPages: Math.ceil(totalItems / limit),
       currentPage: page,
     };
+  }
+
+  /**
+   * [👑 ADMIN] Get list of all Sub-Admins with populated assigned zones
+   */
+  async getSubAdmins(): Promise<UserDocument[]> {
+    return this.userModel
+      .find({ role: 'sub_admin' })
+      .populate('assignedZones')
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
+  /**
+   * [👑 ADMIN] Create / Provision a new Sub-Admin manager
+   */
+  async createSubAdmin(dto: {
+    name: string;
+    email: string;
+    phone?: string;
+    assignedZones?: string[];
+    permissions?: any;
+  }): Promise<UserDocument> {
+    let firebaseUid = `sub_admin_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    // 1. Sync / Provision in Firebase Auth
+    try {
+      let fbUser: admin.auth.UserRecord;
+      try {
+        fbUser = await this.firebaseApp.auth().getUserByEmail(dto.email);
+      } catch (err: any) {
+        if (err.code === 'auth/user-not-found') {
+          fbUser = await this.firebaseApp.auth().createUser({
+            email: dto.email,
+            displayName: dto.name,
+            phoneNumber:
+              dto.phone && dto.phone.startsWith('+') && dto.phone.length > 10
+                ? dto.phone
+                : undefined,
+            emailVerified: true,
+          });
+        } else {
+          throw err;
+        }
+      }
+
+      if (fbUser) {
+        firebaseUid = fbUser.uid;
+        // Stamp custom role claim in Firebase Auth token
+        await this.firebaseApp.auth().setCustomUserClaims(firebaseUid, {
+          role: 'sub_admin',
+        });
+      }
+    } catch (fbErr) {
+      console.warn(
+        'Firebase Auth provisioning warning for Sub-Admin (will link on first login):',
+        fbErr,
+      );
+    }
+
+    const zoneIds = (dto.assignedZones || []).map(
+      (z) => new Types.ObjectId(z),
+    );
+
+    // 2. Upsert in MongoDB
+    let subAdmin = await this.userModel.findOne({ email: dto.email }).exec();
+    if (subAdmin) {
+      subAdmin.role = 'sub_admin';
+      subAdmin.name = dto.name;
+      subAdmin.firebaseUid = firebaseUid;
+      if (dto.phone) subAdmin.phone = dto.phone;
+      subAdmin.assignedZones = zoneIds;
+      subAdmin.permissions = dto.permissions || subAdmin.permissions;
+    } else {
+      subAdmin = new this.userModel({
+        firebaseUid,
+        name: dto.name,
+        email: dto.email,
+        phone: dto.phone,
+        role: 'sub_admin',
+        assignedZones: zoneIds,
+        permissions: dto.permissions || {
+          canManageOrders: true,
+          canApproveRestaurants: true,
+          canManageDrivers: true,
+          canViewFinancials: false,
+          canTriggerSurge: true,
+        },
+      });
+    }
+
+    return subAdmin.save();
+  }
+
+  /**
+   * [👑 ADMIN] Update Sub-Admin details, assigned zones or permissions
+   */
+  async updateSubAdmin(
+    id: string,
+    dto: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      assignedZones?: string[];
+      permissions?: any;
+      isActive?: boolean;
+    },
+  ): Promise<UserDocument> {
+    const updateData: any = {};
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.email !== undefined) updateData.email = dto.email;
+    if (dto.phone !== undefined) updateData.phone = dto.phone;
+    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+    if (dto.permissions !== undefined) updateData.permissions = dto.permissions;
+    if (dto.assignedZones !== undefined) {
+      updateData.assignedZones = dto.assignedZones.map(
+        (z) => new Types.ObjectId(z),
+      );
+    }
+
+    const updated = await this.userModel
+      .findByIdAndUpdate(id, { $set: updateData }, { new: true })
+      .populate('assignedZones')
+      .exec();
+
+    if (!updated) {
+      throw new NotFoundException(`Sub-Admin with ID ${id} not found.`);
+    }
+    return updated;
   }
 }

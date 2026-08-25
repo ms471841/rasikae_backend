@@ -25,9 +25,9 @@ export class AnalyticsController {
    */
   @Get('global')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
-  @Roles('admin')
-  getGlobalStats() {
-    return this.analyticsService.getGlobalStats();
+  @Roles('admin', 'sub_admin')
+  getGlobalStats(@CurrUser() user: any) {
+    return this.analyticsService.getGlobalStats(user);
   }
 
   /**
@@ -36,9 +36,9 @@ export class AnalyticsController {
    */
   @Get('trends')
   @UseGuards(FirebaseAuthGuard, RolesGuard)
-  @Roles('admin')
-  getWeeklyTrends() {
-    return this.analyticsService.getWeeklyTrends();
+  @Roles('admin', 'sub_admin')
+  getWeeklyTrends(@CurrUser() user: any) {
+    return this.analyticsService.getWeeklyTrends(user);
   }
 
   // --------------------------------------------------------------------------
