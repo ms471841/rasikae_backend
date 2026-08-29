@@ -8,6 +8,7 @@ import {
   ValidateNested,
   IsMongoId,
   IsInt,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -76,10 +77,12 @@ export class CreateMenuItemDto {
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(80)
   name: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(500)
   description?: string;
 
   @IsInt()
