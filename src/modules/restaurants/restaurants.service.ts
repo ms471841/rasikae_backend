@@ -327,7 +327,7 @@ export class RestaurantsService {
   async findByOwner(ownerId: string): Promise<Restaurant[]> {
     return this.restaurantModel
       .find({ ownerId })
-      .populate('categories cuisines')
+      .populate('categories cuisines zoneId')
       .exec();
   }
 
@@ -340,7 +340,7 @@ export class RestaurantsService {
 
     const restaurant = await this.restaurantModel
       .findById(id)
-      .populate('categories cuisines')
+      .populate('categories cuisines zoneId')
       .exec();
     if (!restaurant) {
       throw new NotFoundException(`Restaurant with ID ${id} not found`);

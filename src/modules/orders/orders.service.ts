@@ -214,12 +214,15 @@ export class OrdersService {
         .exec();
 
       const zone = (restaurant as any)?.zoneId;
-      const baseDeliveryFee =
-        zone && zone.baseDeliveryFeeInPaise != null
-          ? zone.baseDeliveryFeeInPaise
-          : settings.deliveryBaseFee;
-      const surgeFee = zone && zone.surgeFeeInPaise ? zone.surgeFeeInPaise : 0;
-      const staticDeliveryFee = baseDeliveryFee + surgeFee;
+      let staticDeliveryFee = 0;
+      if (!restaurant?.isFreeDelivery) {
+        const baseDeliveryFee =
+          zone && zone.baseDeliveryFeeInPaise != null
+            ? zone.baseDeliveryFeeInPaise
+            : settings.deliveryBaseFee;
+        const surgeFee = zone && zone.surgeFeeInPaise ? zone.surgeFeeInPaise : 0;
+        staticDeliveryFee = baseDeliveryFee + surgeFee;
+      }
 
       const packagingFee = items.reduce(
         (acc, current) =>
@@ -395,12 +398,15 @@ export class OrdersService {
         .exec();
 
       const zone = (restaurant as any)?.zoneId;
-      const baseDeliveryFee =
-        zone && zone.baseDeliveryFeeInPaise != null
-          ? zone.baseDeliveryFeeInPaise
-          : settings.deliveryBaseFee;
-      const surgeFee = zone && zone.surgeFeeInPaise ? zone.surgeFeeInPaise : 0;
-      const deliveryFee = baseDeliveryFee + surgeFee;
+      let deliveryFee = 0;
+      if (!restaurant?.isFreeDelivery) {
+        const baseDeliveryFee =
+          zone && zone.baseDeliveryFeeInPaise != null
+            ? zone.baseDeliveryFeeInPaise
+            : settings.deliveryBaseFee;
+        const surgeFee = zone && zone.surgeFeeInPaise ? zone.surgeFeeInPaise : 0;
+        deliveryFee = baseDeliveryFee + surgeFee;
+      }
 
       const packagingFee = items.reduce(
         (acc, i) => acc + (i.packagingCharge || 0) * i.quantity,

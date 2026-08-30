@@ -40,7 +40,12 @@ export class CartsService {
       })
       .populate({
         path: 'items.restaurantId',
-        select: 'name logo address rating',
+        select:
+          'name logo address rating isFreeDelivery zoneId isVeg deliveryTime',
+        populate: {
+          path: 'zoneId',
+          select: 'baseDeliveryFeeInPaise surgeFeeInPaise name',
+        },
       })
       .exec();
 
