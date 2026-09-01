@@ -94,7 +94,7 @@ export class OrdersService {
   private extractId(id: any): string {
     if (!id) return '';
     if (typeof id === 'string') return id;
-    if (id instanceof Types.ObjectId) return id.toHexString();
+    if (id instanceof Types.ObjectId) return id.toString();
     if (id._id) return id._id.toString();
     return id.toString();
   }

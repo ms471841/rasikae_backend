@@ -16,6 +16,7 @@ import {
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { SocketsGateway } from '../sockets/sockets.gateway';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class CartsService {
@@ -24,35 +25,113 @@ export class CartsService {
     @InjectModel(MenuItem.name) private menuItemModel: Model<MenuItemDocument>,
     @Inject(forwardRef(() => SocketsGateway))
     private readonly socketsGateway: SocketsGateway,
+    private readonly settingsService: SettingsService,
   ) {}
 
-  private calculateCartTotal(cart: CartDocument): number {
-    return cart.items.reduce((total, item) => total + item.totalItemPrice, 0);
+  private async calculateCartBilling(cart: CartDocument): Promise<{
+    subtotal: number;
+    packagingFee: number;
+    deliveryFee: number;
+    tax: number;
+    cgst: number;
+    sgst: number;
+    total: number;
+  }> {
+    const subtotal = cart.items.reduce(
+      (total, item) => total + item.totalItemPrice,
+      0,
+    );
+
+    if (cart.items.length === 0) {
+      return {
+        subtotal: 0,
+        packagingFee: 0,
+        deliveryFee: 0,
+        tax: 0,
+        cgst: 0,
+        sgst: 0,
+        total: 0,
+      };
+    }
+
+    // Packaging fee from menu item packaging charges
+    const packagingFee = cart.items.reduce((acc, item) => {
+      const itemPkg =
+        (item.menuItemId as any)?.packagingChargeInPaise ||
+        (item.menuItemId as any)?.packagingCharge ||
+        0;
+      return acc + itemPkg * item.quantity;
+    }, 0);
+
+    const settings = await this.settingsService.getSettings();
+
+    // Tax calculation
+    const tax = Math.round(subtotal * (settings?.taxPercentage ?? 0.05));
+    const cgst = Math.round(tax / 2);
+    const sgst = tax - cgst;
+
+    // Delivery Fee calculation
+    const restaurant = cart.items[0]?.restaurantId as any;
+    let deliveryFee = 0;
+    if (!restaurant?.isFreeDelivery) {
+      const zone = restaurant?.zoneId;
+      const baseDeliveryFee =
+        zone && zone.baseDeliveryFeeInPaise != null
+          ? zone.baseDeliveryFeeInPaise
+          : (settings?.deliveryBaseFee ?? 4000);
+      const surgeFee = zone && zone.surgeFeeInPaise ? zone.surgeFeeInPaise : 0;
+      deliveryFee = baseDeliveryFee + surgeFee;
+    }
+
+    const total = Math.max(0, subtotal + packagingFee + deliveryFee + tax);
+
+    return {
+      subtotal,
+      packagingFee,
+      deliveryFee,
+      tax,
+      cgst,
+      sgst,
+      total,
+    };
+  }
+
+  private async syncAndSaveBilling(cart: CartDocument): Promise<CartDocument> {
+    const billing = await this.calculateCartBilling(cart);
+    cart.totalPrice = billing.subtotal;
+    cart.subtotal = billing.subtotal;
+    cart.packagingFee = billing.packagingFee;
+    cart.deliveryFee = billing.deliveryFee;
+    cart.tax = billing.tax;
+    cart.cgst = billing.cgst;
+    cart.sgst = billing.sgst;
+    cart.total = billing.total;
+    await cart.save();
+    return cart;
   }
 
   async getCart(userId: string): Promise<CartDocument> {
-    let cart = await this.cartModel
-      .findOne({ userId })
-      .populate({
-        path: 'items.menuItemId',
-        select:
-          'name price discountPrice image isVeg description packagingChargeInPaise',
-      })
-      .populate({
-        path: 'items.restaurantId',
-        select:
-          'name logo address rating isFreeDelivery zoneId isVeg deliveryTime',
-        populate: {
-          path: 'zoneId',
-          select: 'baseDeliveryFeeInPaise surgeFeeInPaise name',
-        },
-      })
-      .exec();
+    let cart = await this.getPopulatedCart(userId);
 
     if (!cart) {
-      cart = new this.cartModel({ userId, items: [], totalPrice: 0 });
+      cart = new this.cartModel({
+        userId,
+        items: [],
+        totalPrice: 0,
+        subtotal: 0,
+        packagingFee: 0,
+        deliveryFee: 0,
+        tax: 0,
+        cgst: 0,
+        sgst: 0,
+        total: 0,
+      });
       await cart.save();
+      return cart;
     }
+
+    // Refresh billing dynamically in case settings or zone prices updated
+    await this.syncAndSaveBilling(cart);
     return cart;
   }
 
@@ -67,14 +146,14 @@ export class CartsService {
       throw new BadRequestException('This item is currently unavailable');
     }
 
-    const cart = await this.getCart(userId);
+    let cart = await this.cartModel.findOne({ userId }).exec();
+    if (!cart) {
+      cart = new this.cartModel({ userId, items: [], totalPrice: 0 });
+    }
 
     // Cross-Restaurant Validation
     if (cart.items.length > 0) {
-      // Handle potential population of restaurantId
-      const existingRestaurantId =
-        (cart.items[0].restaurantId as any)._id?.toString() ||
-        cart.items[0].restaurantId.toString();
+      const existingRestaurantId = cart.items[0].restaurantId.toString();
       const newRestaurantId = menuItem.restaurantId.toString();
 
       if (existingRestaurantId !== newRestaurantId) {
@@ -108,7 +187,6 @@ export class CartsService {
         let foundAddon: any = null;
         let foundGroupName = '';
 
-        // Search through all addon groups to find the specific addon
         for (const group of (menuItem as any).addonGroups) {
           const option = group.options.find((o: any) => o.name === addonName);
           if (option) {
@@ -136,12 +214,8 @@ export class CartsService {
     const basePrice = menuItem.price;
     const totalItemPrice = (basePrice + variantPrice + addonsPrice) * quantity;
 
-    // Check if exactly same item configuration exists to just increment quantity
     const existingItemIndex = cart.items.findIndex((item) => {
-      // Handle potential population of menuItemId
-      const itemMenuId =
-        (item.menuItemId as any)._id?.toString() || item.menuItemId.toString();
-
+      const itemMenuId = item.menuItemId.toString();
       const sameMenuItem = itemMenuId === menuItemId;
       const sameVariant =
         (item.variant?.name || null) === (selectedVariant?.name || null);
@@ -174,15 +248,18 @@ export class CartsService {
       });
     }
 
-    cart.totalPrice = this.calculateCartTotal(cart);
     await cart.save();
-    const updatedCart = await this.getPopulatedCart(userId);
-    this.socketsGateway.emitCartUpdated(userId, updatedCart);
-    return updatedCart;
+    const populatedCart = await this.getPopulatedCart(userId);
+    if (!populatedCart) {
+      throw new NotFoundException('Cart not found after update');
+    }
+    await this.syncAndSaveBilling(populatedCart);
+    this.socketsGateway.emitCartUpdated(userId, populatedCart);
+    return populatedCart;
   }
 
-  private async getPopulatedCart(userId: string): Promise<CartDocument> {
-    const cart = await this.cartModel
+  private async getPopulatedCart(userId: string): Promise<CartDocument | null> {
+    return this.cartModel
       .findOne({ userId })
       .populate({
         path: 'items.menuItemId',
@@ -191,14 +268,14 @@ export class CartsService {
       })
       .populate({
         path: 'items.restaurantId',
-        select: 'name logo address rating',
+        select:
+          'name logo address rating isFreeDelivery zoneId isVeg deliveryTime',
+        populate: {
+          path: 'zoneId',
+          select: 'baseDeliveryFeeInPaise surgeFeeInPaise name',
+        },
       })
       .exec();
-
-    if (!cart) {
-      throw new NotFoundException('Cart not found after update');
-    }
-    return cart;
   }
 
   async updateCartItem(
@@ -223,11 +300,14 @@ export class CartsService {
     item.quantity = quantity;
     item.totalItemPrice = singleUnitPrice * quantity;
 
-    cart.totalPrice = this.calculateCartTotal(cart);
     await cart.save();
-    const updatedCart = await this.getPopulatedCart(userId);
-    this.socketsGateway.emitCartUpdated(userId, updatedCart);
-    return updatedCart;
+    const populatedCart = await this.getPopulatedCart(userId);
+    if (!populatedCart) {
+      throw new NotFoundException('Cart not found after update');
+    }
+    await this.syncAndSaveBilling(populatedCart);
+    this.socketsGateway.emitCartUpdated(userId, populatedCart);
+    return populatedCart;
   }
 
   async removeItem(userId: string, itemId: string): Promise<Cart> {
@@ -237,11 +317,16 @@ export class CartsService {
     }
 
     cart.items = cart.items.filter((i) => i._id.toString() !== itemId);
-    cart.totalPrice = this.calculateCartTotal(cart);
     await cart.save();
-    const updatedCart = await this.getPopulatedCart(userId);
-    this.socketsGateway.emitCartUpdated(userId, updatedCart);
-    return updatedCart;
+    const populatedCart = await this.getPopulatedCart(userId);
+    if (populatedCart) {
+      await this.syncAndSaveBilling(populatedCart);
+      this.socketsGateway.emitCartUpdated(userId, populatedCart);
+      return populatedCart;
+    }
+    const emptyCart = await this.getCart(userId);
+    this.socketsGateway.emitCartUpdated(userId, emptyCart);
+    return emptyCart;
   }
 
   async clearCart(userId: string): Promise<void> {
@@ -250,6 +335,13 @@ export class CartsService {
       userId,
       items: [],
       totalPrice: 0,
+      subtotal: 0,
+      packagingFee: 0,
+      deliveryFee: 0,
+      tax: 0,
+      cgst: 0,
+      sgst: 0,
+      total: 0,
     });
   }
 }

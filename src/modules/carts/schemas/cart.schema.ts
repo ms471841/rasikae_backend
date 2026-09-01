@@ -72,7 +72,28 @@ export class Cart {
   items: CartItem[];
 
   @Prop({ required: true, default: 0 })
-  totalPrice: number; // Stored in Paise (integers)
+  totalPrice: number; // Subtotal in Paise (backward compatible)
+
+  @Prop({ default: 0 })
+  subtotal: number; // Subtotal in Paise
+
+  @Prop({ default: 0 })
+  deliveryFee: number; // Delivery fee in Paise
+
+  @Prop({ default: 0 })
+  packagingFee: number; // Packaging fee in Paise
+
+  @Prop({ default: 0 })
+  tax: number; // Total Tax in Paise
+
+  @Prop({ default: 0 })
+  cgst: number; // CGST in Paise
+
+  @Prop({ default: 0 })
+  sgst: number; // SGST in Paise
+
+  @Prop({ default: 0 })
+  total: number; // Grand total in Paise
 }
 
 export const CartSchema = SchemaFactory.createForClass(Cart);

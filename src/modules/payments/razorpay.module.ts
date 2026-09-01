@@ -1,6 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Razorpay from 'razorpay';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Razorpay = require('razorpay');
 
 @Global()
 @Module({
@@ -17,7 +18,8 @@ import Razorpay from 'razorpay';
           return null;
         }
 
-        return new Razorpay({
+        const RazorpayClass = (Razorpay as any).default || Razorpay;
+        return new RazorpayClass({
           key_id: keyId,
           key_secret: keySecret,
         });
