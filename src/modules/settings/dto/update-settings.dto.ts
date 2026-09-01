@@ -3,7 +3,6 @@ import {
   IsNumber,
   IsBoolean,
   IsOptional,
-  IsArray,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -16,30 +15,6 @@ class SupportContactDto {
   @IsString()
   @IsOptional()
   phone?: string;
-}
-
-export class FAQItemDto {
-  @IsString()
-  @IsOptional()
-  _id?: string;
-
-  @IsString()
-  question: string;
-
-  @IsString()
-  answer: string;
-
-  @IsString()
-  @IsOptional()
-  category?: string;
-
-  @IsNumber()
-  @IsOptional()
-  order?: number;
-
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean;
 }
 
 export class UpdateSettingsDto {
@@ -75,28 +50,4 @@ export class UpdateSettingsDto {
   @Type(() => SupportContactDto)
   @IsOptional()
   supportContact?: SupportContactDto;
-
-  // ─── Legal & CMS Static Content ──────────────────────────────────────────
-  @IsString()
-  @IsOptional()
-  termsAndConditions?: string;
-
-  @IsString()
-  @IsOptional()
-  privacyPolicy?: string;
-
-  @IsString()
-  @IsOptional()
-  aboutUs?: string;
-
-  @IsString()
-  @IsOptional()
-  refundPolicy?: string;
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => FAQItemDto)
-  @IsOptional()
-  faqs?: FAQItemDto[];
 }
-

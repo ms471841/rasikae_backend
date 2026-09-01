@@ -28,6 +28,8 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { ContentModule } from './modules/content/content.module';
+import { FaqModule } from './modules/faq/faq.module';
 import { SearchModule } from './modules/search/search.module';
 import { FavouriteRestaurantsModule } from './modules/favourite-restaurants/favourite-restaurants.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -67,6 +69,8 @@ import { CacheModule } from './modules/cache/cache.module';
     NotificationsModule,
     UploadsModule,
     SettingsModule,
+    ContentModule,
+    FaqModule,
     SearchModule,
     FavouriteRestaurantsModule,
     ReportsModule,
