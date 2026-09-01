@@ -62,12 +62,31 @@ export class UsersService {
     return user;
   }
 
-  async getProfile(firebaseUid: string): Promise<UserDocument> {
+  async getProfile(firebaseUid: string): Promise<any> {
     const user = await this.userModel.findOne({ firebaseUid }).exec();
     if (!user) {
       throw new NotFoundException('User profile not found');
     }
-    return user;
+
+    const userId = user._id;
+
+    // Concurrently calculate real-time user statistics
+    const [ordersCount, addressesCount] = await Promise.all([
+      this.orderModel.countDocuments({ userId }).exec(),
+      this.addressModel.countDocuments({ userId }).exec(),
+    ]);
+
+    const favoritesCount = user.favorites?.length || 0;
+
+    const userObj = user.toObject();
+    return {
+      ...userObj,
+      stats: {
+        ordersCount,
+        favoritesCount,
+        addressesCount,
+      },
+    };
   }
 
   async findByPhone(phone: string): Promise<UserDocument | null> {
