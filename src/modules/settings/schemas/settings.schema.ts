@@ -14,6 +14,26 @@ class SupportContact {
 
 const SupportContactSchema = SchemaFactory.createForClass(SupportContact);
 
+@Schema({ _id: true, timestamps: true })
+export class FAQItem {
+  @Prop({ required: true })
+  question: string;
+
+  @Prop({ required: true })
+  answer: string;
+
+  @Prop({ default: 'General' })
+  category: string;
+
+  @Prop({ default: 0 })
+  order: number;
+
+  @Prop({ default: true })
+  isActive: boolean;
+}
+
+const FAQItemSchema = SchemaFactory.createForClass(FAQItem);
+
 @Schema({ timestamps: true })
 export class Settings {
   @Prop({ default: 'GLOBAL_CONFIG' })
@@ -45,6 +65,23 @@ export class Settings {
 
   @Prop({ type: SupportContactSchema, default: {} })
   supportContact: SupportContact;
+
+  // ─── Legal & Static CMS Content ──────────────────────────────────────────
+  @Prop({ type: String, default: '' })
+  termsAndConditions: string;
+
+  @Prop({ type: String, default: '' })
+  privacyPolicy: string;
+
+  @Prop({ type: String, default: '' })
+  aboutUs: string;
+
+  @Prop({ type: String, default: '' })
+  refundPolicy: string;
+
+  @Prop({ type: [FAQItemSchema], default: [] })
+  faqs: FAQItem[];
 }
 
 export const SettingsSchema = SchemaFactory.createForClass(Settings);
+

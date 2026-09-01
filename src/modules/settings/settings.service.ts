@@ -27,8 +27,15 @@ export class SettingsService implements OnModuleInit {
       .findOne({ configId: this.CONFIG_ID })
       .exec();
     if (!settings) {
-      this.logger.log('Initializing global settings with default values...');
-      const newSettings = new this.settingsModel({ configId: this.CONFIG_ID });
+      this.logger.log('Initializing global settings...');
+      const newSettings = new this.settingsModel({
+        configId: this.CONFIG_ID,
+        termsAndConditions: '',
+        privacyPolicy: '',
+        aboutUs: '',
+        refundPolicy: '',
+        faqs: [],
+      });
       await newSettings.save();
       await this.cacheService.set(this.CACHE_KEY, newSettings.toJSON ? newSettings.toJSON() : newSettings, this.CACHE_TTL_SECONDS);
     } else {
