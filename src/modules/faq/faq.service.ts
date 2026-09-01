@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, FilterQuery } from 'mongoose';
+import { Model } from 'mongoose';
 import { Faq, FaqDocument } from './schemas/faq.schema';
 import { CreateFaqDto } from './dto/create-faq.dto';
 import { UpdateFaqDto } from './dto/update-faq.dto';
@@ -19,7 +19,7 @@ export class FaqService {
   ) {}
 
   async getFaqs(query: QueryFaqDto) {
-    const filter: FilterQuery<FaqDocument> = {};
+    const filter: Record<string, any> = {};
 
     if (query.category && query.category !== 'ALL') {
       filter.category = query.category;
